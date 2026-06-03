@@ -281,8 +281,8 @@ async function carregarDados() {
       dbGet('mensalidades','','criado_em.desc'),
     ]);
 
+    MEDICOS.length = 0;
     if(meds.length > 0) {
-      MEDICOS.length = 0;
       meds.forEach(m => MEDICOS.push({
         id:m.id, nome:m.nome, especialidade:m.especialidade||'', endereco:m.endereco||'',
         banco:m.banco||'', agencia:m.agencia||'', conta:m.conta||'',
@@ -290,8 +290,9 @@ async function carregarDados() {
       }));
     }
 
+    // Sempre limpa e recarrega do banco
+    CLIENTES.length = 0;
     if(clis.length > 0) {
-      CLIENTES.length = 0;
       clis.forEach(c => CLIENTES.push({
         codigo:c.codigo, nome:c.nome, cpf:c.cpf||'', rg:c.rg||'',
         nascimento:c.nascimento||'', endereco:c.endereco||'',

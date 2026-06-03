@@ -2199,8 +2199,7 @@ function renderAgenda() {
                   <td style="text-align:center">
                     <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
                       <button onclick="editarAgenda(${a.id})" style="padding:5px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;font-weight:700;cursor:pointer">✏️</button>
-                      ${(a.convenio==="Mais Fácil Saúde" && a.status==="Pago")?
-                        `<button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>`:""}
+                      <button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>
                       <button onclick="excluirAgenda(${a.id})" style="padding:5px 10px;background:#fee2e2;border:none;border-radius:6px;color:#dc2626;font-size:11px;cursor:pointer">✕</button>
                     </div>
                   </td>
@@ -2737,18 +2736,9 @@ async function mudarStatusAg(id, novoStatus) {
   await dbUpdate('agenda','id',id,{status:novoStatus});
   const idx = AGENDA.findIndex(x=>x.id===id);
   if(idx>=0) AGENDA[idx].status = novoStatus;
-  // Se status = Pago, emite guia automaticamente
+  // Se status = Pago, confirmar pagamento da autorização
   if(novoStatus === "Pago") {
-    const a = AGENDA[idx];
-    if(a && a.codigoMFS) {
-      const c = CLIENTES.find(x=>x.codigo===a.codigoMFS);
-      if(c && c.status !== "inadimplente") {
-        if(confirm("Deseja emitir a Guia Médica para este atendimento pago?")) {
-          emitirGuiaAgenda(id);
-          return;
-        }
-      }
-    }
+    alert("✅ Pagamento da autorização confirmado!\n\nPaciente: " + (AGENDA.find(x=>x.id===id)||{}).nomePaciente + "\n\nRegistro atualizado com sucesso.");
   }
   renderAgenda();
 }

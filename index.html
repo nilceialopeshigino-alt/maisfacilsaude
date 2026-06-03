@@ -1659,7 +1659,7 @@ function renderCaixa() {
               <td><span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:6px;font-size:11px">${m.categoria||"—"}</span></td>
               <td><span class="chip" style="background:${(corFP[m.formaPgto]||"#94a3b8")}22;color:${corFP[m.formaPgto]||"#94a3b8"}">${m.formaPgto||"—"}</span></td>
               <td style="text-align:right;font-weight:800;font-family:monospace;color:${m.tipo==="entrada"?"#16a34a":"#dc2626"}">${m.tipo==="saida"?"-":""}${fmt(m.valor)}</td>
-              <td><button style="padding:4px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;cursor:pointer;font-size:11px;font-weight:700" onclick="imprimirReciboCaixa(${JSON.stringify(m).replace(/'/g,&quot;&quot;)})">🖨️</button>
+              <td><button style="padding:4px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;cursor:pointer;font-size:11px;font-weight:700" onclick="imprimirReciboCaixa(${JSON.stringify(m).replace(/'/g,"")})">🖨️</button>
               <button style="padding:4px 10px;background:#fee2e2;border:none;border-radius:6px;color:#dc2626;cursor:pointer;font-size:12px" onclick="excluirLancamento(${m.id})">✕</button></td>
             </tr>`).join("")}
           </tbody>

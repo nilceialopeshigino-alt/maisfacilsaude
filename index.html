@@ -175,16 +175,8 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
 
 <script>
 // ── DADOS ──
-const MEDICOS = [
-  {id:"MED001",nome:"Dr. Ricardo Alves",especialidade:"Clínica Médica",endereco:"Rua das Flores, 210 - Centro - SP",banco:"Bradesco",agencia:"1234-5",conta:"00123456-7",cpf:"111.222.333-44",pix:"dr.ricardo@email.com",senha:"1234"},
-  {id:"MED002",nome:"Dra. Fernanda Costa",especialidade:"Cardiologia",endereco:"Av. Brasil, 540 - Jd. América - SP",banco:"Itaú",agencia:"4567-8",conta:"00789012-3",cpf:"222.333.444-55",pix:"fernanda.costa@email.com",senha:"1234"},
-  {id:"MED003",nome:"Dr. Henrique Borges",especialidade:"Ortopedia",endereco:"Rua Tiradentes, 88 - Vila Nova - SP",banco:"Caixa",agencia:"0123",conta:"12345678-0",cpf:"333.444.555-66",pix:"11999990000",senha:"1234"},
-];
-let CLIENTES = [
-  {codigo:"MFS00001",nome:"Maria José Santos",cpf:"123.456.789-00",nascimento:"1980-05-12",endereco:"Rua das Palmeiras, 345 - SP",telefone:"(11) 98765-4321",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[{nome:"Carlos Santos",cpf:"234.567.890-11",nascimento:"2005-08-20"},{nome:"Ana Santos",cpf:"345.678.901-22",nascimento:"2010-03-15"}],carneAtual:8},
-  {codigo:"MFS00002",nome:"João Pedro Lima",cpf:"456.789.012-33",nascimento:"1975-11-30",endereco:"Av. Paulista, 1000 - SP",telefone:"(11) 97654-3210",mensalidade:259.90,vencimento:15,status:"inadimplente",plano:"ativo",dependentes:[],carneAtual:11},
-  {codigo:"MFS00003",nome:"Patrícia Rocha",cpf:"567.890.123-44",nascimento:"1990-02-18",endereco:"Rua XV de Novembro, 77 - Campinas/SP",telefone:"(19) 96543-2109",mensalidade:189.90,vencimento:5,status:"adimplente",plano:"ativo",dependentes:[{nome:"Lucas Rocha",cpf:"678.901.234-55",nascimento:"2015-07-04"}],carneAtual:12},
-];
+const MEDICOS = [];
+let CLIENTES = [];
 let GUIAS = [];
 let GC = 1000;
 let LOGIN = null;

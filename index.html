@@ -209,7 +209,7 @@ const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ag
 // ── SUPABASE — BANCO DE DADOS ──
 // ══════════════════════════════════════════════
 const SUPA_URL = 'https://mvnriexmmelyvokrsils.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12bnJpZXhtbWVseXZva3JzaWxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNjI3NTEsImV4cCI6MjA5NTgzODc1MX0.Jq0ord1TT9KSwjCBnOJ7uoQm3N_Uf3beBoHkuL4Is4c';
+const SUPA_KEY = 'sb_publishable_xCnE6tOFi5Y1teEFVmNciA_G12Glqcs';
 
 const SUPA_HEADERS = {
   'apikey': SUPA_KEY,
@@ -242,9 +242,18 @@ async function dbInsert(tabela, dados) {
       headers: SUPA_HEADERS,
       body: JSON.stringify(dados)
     });
-    if (!r.ok) { console.error('dbInsert error:', r.status, await r.text()); return null; }
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('dbInsert error:', r.status, errText);
+      alert('❌ Erro ao salvar em ' + tabela + '\nStatus: ' + r.status + '\n' + errText);
+      return null;
+    }
     return await r.json();
-  } catch(e) { console.error('dbInsert exception:', e); return null; }
+  } catch(e) {
+    console.error('dbInsert exception:', e);
+    alert('❌ Erro de conexão: ' + e.message);
+    return null;
+  }
 }
 
 async function dbUpdate(tabela, campo, valor, dados) {

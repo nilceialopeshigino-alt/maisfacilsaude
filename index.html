@@ -228,19 +228,20 @@ async function dbGet(tabela, filtros='', ordem='') {
 }
 
 async function dbInsert(tabela, dados) {
+  console.log('dbInsert tentando:', tabela, JSON.stringify(dados).substring(0,100));
   try {
     const r = await fetch(`${SUPA_URL}/rest/v1/${tabela}`, {
       method: 'POST',
       headers: SUPA_HEADERS,
       body: JSON.stringify(dados)
     });
+    const respText = await r.text();
+    console.log('dbInsert resposta:', tabela, r.status, respText.substring(0,200));
     if (!r.ok) {
-      const errText = await r.text();
-      console.error('dbInsert error em ' + tabela + ':', r.status, errText);
-      alert('❌ Erro ao salvar em ' + tabela + '\nStatus: ' + r.status + '\n' + errText.substring(0,200));
+      alert('❌ Erro ao salvar em ' + tabela + '\nStatus: ' + r.status + '\n' + respText.substring(0,300));
       return null;
     }
-    return await r.json();
+    try { return JSON.parse(respText); } catch(e) { return respText; }
   } catch(e) {
     console.error('dbInsert exception:', e);
     alert('❌ Erro de conexão: ' + e.message);

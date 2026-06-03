@@ -690,14 +690,25 @@ function verCli(codigo) {
 }
 
 async function abrirFormCli(codigo) {
-  // Recarrega dados frescos do banco antes de gerar código
-  if(!codigo) await carregarDados();
   const c = codigo ? CLIENTES.find(x=>x.codigo===codigo) : null;
-  const maxCod = CLIENTES.reduce((max, c) => {
-    const n = parseInt((c.codigo||'').replace('MFS',''))||0;
-    return n > max ? n : max;
-  }, 0);
-  const novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
+  // Busca o maior código diretamente do banco
+  let novoCod = "MFS00001";
+  if(!codigo) {
+    try {
+      const todos = await dbGet('clientes','','codigo.desc');
+      const maxCod = todos.reduce((max, c) => {
+        const n = parseInt((c.codigo||'').replace('MFS',''))||0;
+        return n > max ? n : max;
+      }, 0);
+      novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
+    } catch(e) {
+      const maxCod = CLIENTES.reduce((max, c) => {
+        const n = parseInt((c.codigo||'').replace('MFS',''))||0;
+        return n > max ? n : max;
+      }, 0);
+      novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
+    }
+  }
   const f = c ? {...c,dependentes:[...c.dependentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
 
   el("aba-clientes").innerHTML = `

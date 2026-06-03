@@ -682,7 +682,9 @@ function verCli(codigo) {
     </div>`;
 }
 
-function abrirFormCli(codigo) {
+async function abrirFormCli(codigo) {
+  // Recarrega dados frescos do banco antes de gerar código
+  if(!codigo) await carregarDados();
   const c = codigo ? CLIENTES.find(x=>x.codigo===codigo) : null;
   const maxCod = CLIENTES.reduce((max, c) => {
     const n = parseInt((c.codigo||'').replace('MFS',''))||0;

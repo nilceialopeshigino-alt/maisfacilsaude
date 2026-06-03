@@ -274,7 +274,7 @@ async function carregarDados() {
   try {
     const [meds, clis, guis, ags, cxs, mens] = await Promise.all([
       dbGet('medicos','','nome'),
-      dbGet('clientes','','nome'),
+      dbGet('clientes','','nome.asc'),
       dbGet('guias','','criado_em.desc'),
       dbGet('agenda','','id.desc'),
       dbGet('caixa','','criado_em.desc'),
@@ -411,6 +411,10 @@ async function salvarCli(novoCod, codigoOriginal) {
   if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
   else ok = await dbInsert('clientes',dados);
   if(!ok) { alert("❌ Erro ao salvar. Verifique a conexão e tente novamente."); return; }
+  // Adicionar na memória local imediatamente
+  if(!codigoOriginal) {
+    CLIENTES.push({...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1});
+  }
   await carregarDados();
   renderClientes();
   alert("✅ Beneficiário salvo com sucesso!");
@@ -641,6 +645,8 @@ function renderClientes(busca="",filtro="todos") {
 
 function verCli(codigo) {
   const c = CLIENTES.find(x=>x.codigo===codigo);
+  if(!c){alert("Cliente não encontrado.");renderClientes();return;}
+  if(!c.dependentes) c.dependentes = [];
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
     <div style="background:linear-gradient(135deg,#0c4a6e,#0e7490);border-radius:16px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">

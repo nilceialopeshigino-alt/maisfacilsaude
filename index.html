@@ -1245,8 +1245,8 @@ function imprimirReciboPDF(guia, med, pac) {
       <div class="ln"><span class="lk">Data e Hora:</span><span class="lv">${fmtDH(guia.dataHora)}</span></div>
       <div class="ln"><span class="lk">Nº da Guia:</span><span class="lv" style="font-family:monospace;font-weight:900;color:#0c4a6e">${guia.numero}</span></div>
     </div>
-    <div class="valor-box"><div class="vl">Valor Recebido</div><div class="vn">${fmt(guia.valorPago||guia.valorConsulta)}</div><div class="vf">💳 ${guia.formaPagamento||"Não informado"}</div></div>
-    <div style="text-align:center;font-size:14px;color:#1e293b;line-height:1.9;margin:20px 0;padding:16px;background:#f0fdf4;border-radius:10px;border:1.5px solid #86efac"><strong style="color:#16a34a">✅ PAGAMENTO CONFIRMADO</strong><br>Recebemos <strong>${fmt(guia.valorPago||guia.valorConsulta)}</strong> referente ao atendimento acima.<br><span style="font-size:12px;color:#64748b">Emitido em ${dataHoje}</span></div>
+
+    <div style="text-align:center;font-size:14px;color:#1e293b;line-height:1.9;margin:20px 0;padding:16px;background:#f0fdf4;border-radius:10px;border:1.5px solid #86efac"><strong style="color:#16a34a">✅ PAGAMENTO CONFIRMADO</strong><br>Guia de atendimento emitida pelo Mais Fácil Saúde.<br><span style="font-size:12px;color:#64748b">Emitido em ${dataHoje}</span></div>
     <div class="assinaturas">
       <div class="ass"><div class="la"></div><div style="font-weight:700;font-size:13px">${pac?pac.nome:""}</div><div style="font-size:12px;color:#64748b">CPF: ${pac?pac.cpf:""}</div><div style="font-size:11px;color:#94a3b8">PAGADOR</div></div>
       <div class="ass"><div class="la"></div><div style="font-weight:700;font-size:13px">Mais Fácil Saúde</div><div style="font-size:12px;color:#64748b">CNPJ: 00.000.000/0001-00</div><div style="font-size:11px;color:#94a3b8">PRESTADORA</div></div>
@@ -1267,7 +1267,7 @@ function renderMedicos() {
     <div class="grid2">
       ${MEDICOS.map((m,i)=>`<div class="card"><div class="card-body">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-          <div><div style="font-weight:900;font-size:15px">${m.nome}</div><span class="chip" style="background:#0e749022;color:#0e7490">${m.especialidade}</span></div>
+          <div><div style="font-weight:900;font-size:15px">${m.nome}</div><span class="chip" style="background:#0e749022;color:#0e7490">${m.especialidade}</span><div style="margin-top:6px;font-size:11px;color:#64748b">🔑 Login: <strong style="font-family:monospace;color:#0c4a6e">${m.id}</strong> • Senha: <strong style="font-family:monospace">${m.senha||'1234'}</strong></div></div>
           <button class="btn btn-outline btn-sm" onclick="formMedico(${i})">Editar</button>
         </div>
         <div style="font-size:12px;color:#64748b;line-height:1.9">
@@ -2809,8 +2809,7 @@ ${baixada?`<div style="background:#dc2626;color:#fff;padding:12px 32px"><strong>
     <div>
       <div class="li"><span class="lik">Data e Hora:</span><span class="liv">${fmtDH(guia.dataHora)}</span></div>
       <div class="li"><span class="lik">Tipo:</span><span class="liv">${guia.tipoServico}</span></div>
-      <div class="li"><span class="lik">Valor Pago:</span><span class="liv">${fmt(guia.valorPago||guia.valorConsulta)}</span></div>
-      <div class="li"><span class="lik">Forma Pgto:</span><span class="liv">${guia.formaPagamento||"—"}</span></div>
+
     </div>
     <div>
       <div class="li"><span class="lik">Nº da Guia:</span><span class="liv" style="font-family:monospace;font-weight:900;color:#0c4a6e">${guia.numero}</span></div>

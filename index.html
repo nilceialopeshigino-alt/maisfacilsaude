@@ -691,7 +691,11 @@ function verCli(codigo) {
 
 function abrirFormCli(codigo) {
   const c = codigo ? CLIENTES.find(x=>x.codigo===codigo) : null;
-  const novoCod = "MFS"+String(CLIENTES.length+1).padStart(5,"0");
+  const maxCod = CLIENTES.reduce((max, c) => {
+    const n = parseInt((c.codigo||'').replace('MFS',''))||0;
+    return n > max ? n : max;
+  }, 0);
+  const novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
   const f = c ? {...c,dependentes:[...c.dependentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
 
   el("aba-clientes").innerHTML = `
@@ -778,7 +782,11 @@ function salvarCli(novoCod, codigoOriginal) {
 function editarCli(codigo) { abrirFormCli(codigo); }
 
 function abrirContrato() {
-  const novoCod = "MFS"+String(CLIENTES.length+1).padStart(5,"0");
+  const maxCod = CLIENTES.reduce((max, c) => {
+    const n = parseInt((c.codigo||'').replace('MFS',''))||0;
+    return n > max ? n : max;
+  }, 0);
+  const novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
@@ -866,6 +874,7 @@ function salvarContrato(codigo) {
 function imprimirContrato(codigo, dadosPassados) {
   const c = dadosPassados || CLIENTES.find(x=>x.codigo===codigo);
   if(!c){alert("Cliente não encontrado.");return;}
+  if(!c.dependentes) c.dependentes = [];
   const dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   const logoHtml = LOGO_URL ? `<img src="${LOGO_URL}" style="height:70px;object-fit:contain;">` : `<div style="font-family:Arial,sans-serif;font-weight:900;font-size:22px;color:#000">MAIS FÁCIL SAÚDE</div>`;
 

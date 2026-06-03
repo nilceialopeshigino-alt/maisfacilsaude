@@ -2468,16 +2468,15 @@ function excluirAgenda(id) {
 function emitirGuiaAgenda(id) {
   const a=AGENDA.find(x=>x.id===id);
   if(!a){alert("Agendamento não encontrado.");return;}
-  if(!a.codigoMFS){alert("Este agendamento não tem código MFS vinculado.");return;}
-  const c=CLIENTES.find(x=>x.codigo===a.codigoMFS);
-  if(!c){alert("Beneficiário não encontrado na base.");return;}
-  if(c.status==="inadimplente"){alert("⚠️ Cliente INADIMPLENTE. Regularize antes de emitir a guia.");return;}
+  // Verifica se é beneficiário MFS e se está inadimplente
+  const c=a.codigoMFS?CLIENTES.find(x=>x.codigo===a.codigoMFS):null;
+  if(c&&c.status==="inadimplente"){alert("⚠️ Cliente INADIMPLENTE. Regularize antes de emitir a guia.");return;}
   const med=MEDICOS.find(m=>m.id===a.medicoId);
   const numero=novoNum();
   const mesAt=new Date(a.dataHora).getMonth()+1;
   const anoAt=new Date(a.dataHora).getFullYear();
   const nova={
-    numero, codigoCliente:c.codigo, nomePaciente:a.nomePaciente, cpfPaciente:a.cpf||c.cpf,
+    numero, codigoCliente:c?c.codigo:"PART", nomePaciente:a.nomePaciente, cpfPaciente:a.cpf||(c?c.cpf:""),
     tipoAtendimento:"titular", medicoId:a.medicoId, medicoNome:a.medicoNome,
     especialidade:med?med.especialidade:"", enderecoAtendimento:a.enderecoMedico||med?.endereco||"",
     dataHora:a.dataHora, tipoServico:a.tipoServico,

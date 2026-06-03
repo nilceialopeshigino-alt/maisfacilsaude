@@ -292,6 +292,7 @@ async function carregarDados() {
 
     // Sempre limpa e recarrega do banco
     CLIENTES.length = 0;
+    console.log('Clientes do banco:', clis.length, clis);
     if(clis.length > 0) {
       clis.forEach(c => CLIENTES.push({
         codigo:c.codigo, nome:c.nome, cpf:c.cpf||'', rg:c.rg||'',

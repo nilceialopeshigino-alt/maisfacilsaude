@@ -776,21 +776,7 @@ window.addDep = () => {
   window._DEPS_FORM_RENDER();
 };
 
-function salvarCli(novoCod, codigoOriginal) {
-  const nome=el("f-nome").value.trim();
-  const cpf=el("f-cpf").value.trim();
-  if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
-  const novo={
-    codigo:novoCod, nome, cpf, rg:el("f-rg").value, nascimento:el("f-nasc").value,
-    telefone:el("f-tel").value, email:el("f-email").value, endereco:el("f-end").value,
-    mensalidade:parseFloat(el("f-mens").value)||0, vencimento:parseInt(el("f-venc").value)||10,
-    status:el("f-status").value, plano:el("f-plano").value,
-    carneAtual:parseInt(el("f-carne").value)||1, dependentes:[...(window._DEPS_FORM||[])],
-  };
-  if(codigoOriginal) CLIENTES=CLIENTES.map(c=>c.codigo===codigoOriginal?novo:c);
-  else CLIENTES.push(novo);
-  renderClientes();
-}
+// salvarCli definida acima com Supabase
 
 function editarCli(codigo) { abrirFormCli(codigo); }
 

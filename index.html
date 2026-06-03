@@ -307,7 +307,11 @@ async function carregarDados() {
 
     if(guis.length > 0) {
       GUIAS.length = 0;
-      guis.forEach(g => GUIAS.push({
+      let maxGuiaNum = GC;
+      guis.forEach(g => {
+        const num = parseInt((g.numero||'').replace('GUI',''))||0;
+        if(num > maxGuiaNum) maxGuiaNum = num;
+        GUIAS.push({
         numero:g.numero, codigoCliente:g.codigo_cliente||'',
         nomePaciente:g.nome_paciente||'', cpfPaciente:g.cpf_paciente||'',
         tipoAtendimento:g.tipo_atendimento||'titular',
@@ -323,6 +327,8 @@ async function carregarDados() {
         mesAtendimento:g.mes_atendimento||0, anoAtendimento:g.ano_atendimento||0,
         mesRepasse:g.mes_repasse||0, anoRepasse:g.ano_repasse||0
       }));
+      });
+      GC = maxGuiaNum;
     }
 
     if(ags.length > 0) {
@@ -399,10 +405,13 @@ async function salvarCli(novoCod, codigoOriginal) {
     carne_atual:parseInt(el("f-carne").value)||1,
     dependentes:window._DEPS_FORM||[]
   };
-  if(codigoOriginal) await dbUpdate('clientes','codigo',codigoOriginal,dados);
-  else await dbInsert('clientes',dados);
+  let ok;
+  if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
+  else ok = await dbInsert('clientes',dados);
+  if(!ok) { alert("❌ Erro ao salvar. Verifique a conexão e tente novamente."); return; }
   await carregarDados();
   renderClientes();
+  alert("✅ Beneficiário salvo com sucesso!");
 }
 
 const _salvarContratoOriginal = salvarContrato;
@@ -1201,7 +1210,7 @@ function reimprRecibo(numero) {
 
 function imprimirGuiaPDF(guia, med, pac) {
   const baixada=guia.status==="Baixada";
-  const logoHtml=LOGO_URL?`<img src="${LOGO_URL}" style="height:48px;filter:brightness(0) invert(1)">`:`<div style="color:#fff;font-family:Georgia,serif;font-weight:900;font-size:22px">MAIS FÁCIL SAÚDE</div>`;
+  const logoHtml=LOGO_URL?`<img src="${LOGO_URL}" style="height:48px;filter:brightness(0) saturate(100%) invert(29%) sepia(98%) saturate(500%) hue-rotate(195deg)">`:`<div style="color:#1d4ed8;font-family:Georgia,serif;font-weight:900;font-size:22px;text-shadow:0 0 20px rgba(255,255,255,0.5)">MAIS FÁCIL SAÚDE</div>`;
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Georgia,serif;margin:0;padding:20px}.header{background:linear-gradient(135deg,#0c4a6e,#0e7490);padding:24px 32px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:flex-start}.body{border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;padding:28px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:16px}.sec{font-size:10px;font-weight:900;color:#0e7490;letter-spacing:2px;text-transform:uppercase;border-bottom:2px solid #e0f2fe;padding-bottom:5px;margin-bottom:8px}.li{display:flex;gap:8px;padding:4px 0}.lik{font-size:11px;color:#94a3b8;font-weight:700;min-width:110px}.liv{font-size:13px;color:#1e293b;font-weight:600}.local{background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px}.rodape{border-top:1.5px dashed #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;align-items:center;margin-top:16px}</style></head><body>
   <div class="header">
     <div>${logoHtml}<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2)"><div style="color:rgba(255,255,255,.7);font-size:10px;letter-spacing:3px;font-weight:800">GUIA DE ATENDIMENTO MÉDICO</div><div style="color:#fff;font-weight:900;font-size:20px;margin-top:4px">${guia.numero}</div><div style="color:#7dd3fc;font-size:12px">Emitida em ${fmtDH(guia.emitidaEm)}</div></div></div>
@@ -2749,7 +2758,7 @@ function imprimirGuiaPDFv2(guia, med, pac) {
   // Gerar QR Code com dados da guia
   const qrData = encodeURIComponent(guia.numero + '|' + (guia.nomePaciente||'') + '|' + (guia.dataHora||''));
   const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=' + qrData;
-  const logoHtml = LOGO_URL ? `<img src="${LOGO_URL}" style="height:48px;filter:none">` : `<div style="color:#fff;font-family:Georgia,serif;font-weight:900;font-size:22px">MAIS FÁCIL SAÚDE</div>`;
+  const logoHtml = LOGO_URL ? `<img src="${LOGO_URL}" style="height:48px;filter:none">` : `<div style="color:#1d4ed8;font-family:Georgia,serif;font-weight:900;font-size:22px;text-shadow:0 0 20px rgba(255,255,255,0.5)">MAIS FÁCIL SAÚDE</div>`;
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 body{font-family:Georgia,serif;margin:0;padding:20px}
 .header{background:linear-gradient(135deg,#0c4a6e,#0e7490);padding:24px 32px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:flex-start}

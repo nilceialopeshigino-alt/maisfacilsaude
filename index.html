@@ -312,7 +312,7 @@ async function carregarDados() {
         const num = parseInt((g.numero||'').replace('GUI',''))||0;
         if(num > maxGuiaNum) maxGuiaNum = num;
         GUIAS.push({
-        numero:g.numero, codigoCliente:g.codigo_cliente||'',
+          numero:g.numero, codigoCliente:g.codigo_cliente||'',
         nomePaciente:g.nome_paciente||'', cpfPaciente:g.cpf_paciente||'',
         tipoAtendimento:g.tipo_atendimento||'titular',
         medicoId:g.medico_id||'', medicoNome:g.medico_nome||'',
@@ -325,8 +325,9 @@ async function carregarDados() {
         emitidaEm:g.emitida_em||'', status:g.status||'Emitida',
         baixadaEm:g.baixada_em||'',
         mesAtendimento:g.mes_atendimento||0, anoAtendimento:g.ano_atendimento||0,
-        mesRepasse:g.mes_repasse||0, anoRepasse:g.ano_repasse||0
-      }));
+          mesRepasse:g.mes_repasse||0, anoRepasse:g.ano_repasse||0
+        });
+      });
       GC = maxGuiaNum;
     }
 

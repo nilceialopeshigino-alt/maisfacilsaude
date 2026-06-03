@@ -201,7 +201,7 @@ const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ag
 // ── SUPABASE — BANCO DE DADOS ──
 // ══════════════════════════════════════════════
 const SUPA_URL = 'https://mvnriexmmelyvokrsils.supabase.co';
-const SUPA_KEY = 'sb_publishable_xCnE6tOFi5Y1teEFVmNciA_G12Glqcs';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12bnJpZXhtbWVseXZva3JzaWxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNjI3NTEsImV4cCI6MjA5NTgzODc1MX0.Jq0ord1TT9KSwjCBnOJ7uoQm3N_Uf3beBoHkuL4Is4c';
 
 const SUPA_HEADERS = {
   'apikey': SUPA_KEY,
@@ -228,20 +228,19 @@ async function dbGet(tabela, filtros='', ordem='') {
 }
 
 async function dbInsert(tabela, dados) {
-  console.log('dbInsert tentando:', tabela, JSON.stringify(dados).substring(0,100));
   try {
     const r = await fetch(`${SUPA_URL}/rest/v1/${tabela}`, {
       method: 'POST',
       headers: SUPA_HEADERS,
       body: JSON.stringify(dados)
     });
-    const respText = await r.text();
-    console.log('dbInsert resposta:', tabela, r.status, respText.substring(0,200));
     if (!r.ok) {
-      alert('❌ Erro ao salvar em ' + tabela + '\nStatus: ' + r.status + '\n' + respText.substring(0,300));
+      const errText = await r.text();
+      console.error('dbInsert error:', tabela, r.status, errText);
+      alert('❌ Erro ' + r.status + ' em ' + tabela + ': ' + errText.substring(0,200));
       return null;
     }
-    try { return JSON.parse(respText); } catch(e) { return respText; }
+    return await r.json();
   } catch(e) {
     console.error('dbInsert exception:', e);
     alert('❌ Erro de conexão: ' + e.message);

@@ -412,11 +412,13 @@ async function salvarCli(novoCod, codigoOriginal) {
   if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
   else ok = await dbInsert('clientes',dados);
   if(!ok) { alert("❌ Erro ao salvar. Verifique a conexão e tente novamente."); return; }
-  // Adicionar na memória local imediatamente
-  if(!codigoOriginal) {
+  // Atualizar memória local
+  if(codigoOriginal) {
+    const idx = CLIENTES.findIndex(c=>c.codigo===codigoOriginal);
+    if(idx>=0) CLIENTES[idx] = {...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1};
+  } else {
     CLIENTES.push({...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1});
   }
-  await carregarDados();
   renderClientes();
   alert("✅ Beneficiário salvo com sucesso!");
 }

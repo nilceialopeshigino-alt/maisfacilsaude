@@ -2749,7 +2749,7 @@ function alterarStatusGuia(numero) {
   const g = GUIAS.find(x=>x.numero===numero);
   if(!g){alert("Guia não encontrada.");return;}
   if(g.status==="Baixada") {
-    alert("❌ Esta guia já foi baixada e não pode ser alterada.\n\nGuias baixadas são imutáveis.");
+    alert("🚫 GUIA IMUTÁVEL\n\nEsta guia foi baixada pelo médico "+g.medicoNome+" em "+fmtDH(g.baixadaEm)+".\n\nGuias baixadas pelo médico não podem ser alteradas ou canceladas.e não pode ser alterada.\n\nGuias baixadas são imutáveis.");
     return;
   }
   if(g.status==="Cancelada") {

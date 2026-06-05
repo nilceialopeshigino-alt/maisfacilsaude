@@ -413,7 +413,7 @@ async function salvarCli(novoCod, codigoOriginal) {
     vencimento:parseInt(el("f-venc").value)||10,
     status:el("f-status").value, plano:el("f-plano").value,
     carne_atual:parseInt(el("f-carne").value)||1,
-    dependentes:window._DEPS_FORM||[]
+    dependentes:Array.isArray(window._DEPS_FORM)?window._DEPS_FORM:[]
   };
   let ok;
   if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);

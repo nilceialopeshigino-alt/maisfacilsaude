@@ -191,7 +191,14 @@ const ANO_ATUAL = hoje.getFullYear();
 const fmt = v => (parseFloat(v)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 const fmtDH = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
-const novoNum = () => { GC++; return "GUI"+String(GC).padStart(6,"0"); };
+const novoNum = () => {
+  const maxLocal = GUIAS.reduce((max, g) => {
+    const n = parseInt((g.numero||'').replace('GUI',''))||0;
+    return n > max ? n : max;
+  }, GC);
+  GC = maxLocal + 1;
+  return "GUI"+String(GC).padStart(6,"0");
+};
 const el = id => document.getElementById(id);
 const chip = (label, cor) => `<span class="chip" style="background:${cor}22;color:${cor}">${label}</span>`;
 const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];

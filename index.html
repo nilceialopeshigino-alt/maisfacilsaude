@@ -126,6 +126,8 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
 
 <!-- APP -->
 <div id="app-screen" class="hidden">
+  <!-- Erro de conexão Supabase -->
+  <div id="supabase-erro" style="display:none;background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 20px;margin:16px;color:#991b1b;font-size:13px;line-height:1.7"></div>
   <div id="app-header">
     <div class="header-top">
       <div class="header-logo" id="header-logo-area">
@@ -142,6 +144,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
           </div>
         </div>
         <button class="btn-sair no-print" onclick="sair()">Sair →</button>
+        <button class="btn-sair no-print" onclick="diagnosticarBanco()" style="background:rgba(217,119,6,.25);border-color:rgba(217,119,6,.4);color:#fcd34d">🔍 Diagnóstico</button>
       </div>
     </div>
     <div class="tabs" id="tabs-clinica">
@@ -222,10 +225,8 @@ async function dbGet(tabela, filtros='', ordem='') {
     let url = `${SUPA_URL}/rest/v1/${tabela}?select=*`;
     if (filtros) url += `&${filtros}`;
     if (ordem) {
-      // Converte formato "coluna.desc" para "coluna=desc" do Supabase REST
-      const ord = ordem.replace('.desc','').replace('.asc','');
-      const dir = ordem.includes('.desc') ? 'desc' : 'asc';
-      url += `&order=${ord}.${dir}`;
+      // Supabase REST aceita: order=coluna.desc ou order=coluna.asc
+      url += `&order=${ordem}`;
     }
     const r = await fetch(url, { headers: SUPA_HEADERS });
     if (!r.ok) { const t=await r.text(); console.error('dbGet error em '+tabela+':', r.status, t); return []; }
@@ -279,14 +280,34 @@ async function dbDelete(tabela, campo, valor) {
 async function carregarDados() {
   mostrarLoading(true);
   try {
+    console.log('🔄 Carregando dados do Supabase...');
+
+    // Testar conexão primeiro
+    const testR = await fetch(`${SUPA_URL}/rest/v1/clientes?select=count&limit=1`, { headers: SUPA_HEADERS });
+    if (!testR.ok) {
+      const errTxt = await testR.text();
+      console.error('❌ Supabase erro:', testR.status, errTxt);
+      // Mostrar erro amigável na tela
+      const errDiv = document.getElementById('supabase-erro');
+      if(errDiv) {
+        errDiv.style.display = 'block';
+        errDiv.innerHTML = `<strong>⚠️ Erro ao conectar ao banco:</strong> HTTP ${testR.status} — ${errTxt.substring(0,200)}<br><small>Verifique o Supabase RLS e as políticas de acesso.</small>`;
+      }
+      mostrarLoading(false);
+      return;
+    }
+    console.log('✅ Conexão OK. Carregando tabelas...');
+
     const [meds, clis, guis, ags, cxs, mens] = await Promise.all([
       dbGet('medicos','','nome'),
       dbGet('clientes','','nome.asc'),
-      dbGet('guias','','criado_em.desc'),
+      dbGet('guias','','numero.desc'),
       dbGet('agenda','','id.desc'),
-      dbGet('caixa','','criado_em.desc'),
-      dbGet('mensalidades','','criado_em.desc'),
+      dbGet('caixa','','id.desc'),
+      dbGet('mensalidades','','id.desc'),
     ]);
+
+    console.log(`📊 Resultados: médicos=${meds.length}, clientes=${clis.length}, guias=${guis.length}, agenda=${ags.length}, caixa=${cxs.length}, mensalidades=${mens.length}`);
 
     MEDICOS.length = 0;
     if(meds.length > 0) {
@@ -442,7 +463,7 @@ async function salvarContrato(codigo) {
     mensalidade:parseFloat(el("ct-mens").value)||0,
     vencimento:parseInt(el("ct-venc").value)||10,
     status:'adimplente', plano:'ativo', carne_atual:1,
-    dependentes:window._CT_DEPS||[], data_contrato:new Date().toISOString()
+    dependentes:Array.isArray(window._CT_DEPS)?window._CT_DEPS:[], data_contrato:new Date().toISOString()
   };
   const novo={codigo,nome,cpf,rg:dados.rg,nascimento:dados.nascimento,telefone:dados.telefone,email:dados.email,endereco:dados.endereco,cep:dados.cep,estadoCivil:dados.estado_civil,mensalidade:dados.mensalidade,vencimento:dados.vencimento,status:'adimplente',plano:'ativo',carneAtual:1,dependentes:dados.dependentes,dataContrato:dados.data_contrato};
   await dbInsert('clientes',dados);
@@ -493,6 +514,39 @@ async function iniciarApp() {
   } else {
     renderDashboard();
   }
+}
+
+async function diagnosticarBanco() {
+  const tabelas = ['clientes','medicos','guias','agenda','caixa','mensalidades'];
+  let resultados = '🔍 DIAGNÓSTICO DO BANCO DE DADOS\n';
+  resultados += '═══════════════════════════════\n';
+  resultados += `URL: ${SUPA_URL}\n\n`;
+  for(const t of tabelas) {
+    try {
+      const url = `${SUPA_URL}/rest/v1/${t}?select=*&limit=1`;
+      const r = await fetch(url, { headers: SUPA_HEADERS });
+      const txt = await r.text();
+      if(r.ok) {
+        let data = [];
+        try { data = JSON.parse(txt); } catch(e) {}
+        // Contar total
+        const urlCount = `${SUPA_URL}/rest/v1/${t}?select=count`;
+        const rCount = await fetch(urlCount, { headers: {...SUPA_HEADERS, 'Prefer': 'count=exact'} });
+        const total = rCount.headers.get('content-range') || '?';
+        resultados += `✅ ${t}: OK (content-range: ${total})\n`;
+      } else {
+        resultados += `❌ ${t}: HTTP ${r.status} — ${txt.substring(0,100)}\n`;
+      }
+    } catch(e) {
+      resultados += `💥 ${t}: ERRO — ${e.message}\n`;
+    }
+  }
+  resultados += '\n📋 Dados em memória:\n';
+  resultados += `   Clientes: ${CLIENTES.length}\n`;
+  resultados += `   Médicos: ${MEDICOS.length}\n`;
+  resultados += `   Guias: ${GUIAS.length}\n`;
+  alert(resultados);
+  console.log(resultados);
 }
 
 function sair() {
@@ -1072,9 +1126,12 @@ function renderGuias() {
 }
 
 function guiaRow(g) {
-  return `<div class="guia-row" style="border:1.5px solid ${g.status==="Baixada"?"#86efac":"#e2e8f0"}">
+  const _bc = g.status==="Baixada"?"#86efac":g.status==="Cancelada"?"#fca5a5":"#e2e8f0";
+  const _bg = g.status==="Baixada"?"#dcfce7":g.status==="Cancelada"?"#fee2e2":"#dbeafe";
+  const _ic = g.status==="Baixada"?"✅":g.status==="Cancelada"?"🚫":"📋";
+  return `<div class="guia-row" style="border:1.5px solid ${_bc}">
     <div style="display:flex;gap:14px;align-items:center">
-      <div style="background:${g.status==="Baixada"?"#dcfce7":"#dbeafe"};border-radius:10px;padding:8px 10px;font-size:18px">${g.status==="Baixada"?"✅":"📋"}</div>
+      <div style="background:${_bg};border-radius:10px;padding:8px 10px;font-size:18px">${_ic}</div>
       <div>
         <div style="font-weight:900;color:#0c4a6e;font-size:14px;font-family:monospace">${g.numero}</div>
         <div style="font-size:13px;font-weight:600">${g.nomePaciente}</div>
@@ -1082,11 +1139,10 @@ function guiaRow(g) {
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${chip(g.status,g.status==="Baixada"?"#16a34a":"#0e7490")}
-      ${g.status==="Baixada"?chip("BLOQUEADA","#dc2626"):""}
+      ${chip(g.status,g.status==="Baixada"?"#16a34a":g.status==="Cancelada"?"#dc2626":"#0e7490")}
       <span style="font-weight:800;color:#0e7490">${fmt(g.valorConsulta)}</span>
       <button style="padding:7px 12px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:8px;color:#0e7490;font-weight:700;font-size:12px;cursor:pointer" onclick="reimprGuia('${g.numero}')">🖨️ Guia</button>
-      <button style="padding:7px 12px;background:#fff7ed;border:1.5px solid #f59e0b;border-radius:8px;color:#b45309;font-weight:700;font-size:12px;cursor:pointer" onclick="alterarStatusGuia('${g.numero}')">✏️ Status</button>
+      ${g.status!=="Baixada"&&g.status!=="Cancelada"?`<button style="padding:7px 12px;background:#fee2e2;border:1.5px solid #dc2626;border-radius:8px;color:#dc2626;font-weight:700;font-size:12px;cursor:pointer" onclick="alterarStatusGuia('${g.numero}')">❌ Cancelar</button>`:g.status==="Cancelada"?`<span style="font-size:11px;font-weight:800;color:#dc2626">🚫 Cancelada</span>`:`<span style="font-size:11px;font-weight:800;color:#16a34a">🔒 Baixada</span>`}
       <button style="padding:7px 12px;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:8px;color:#16a34a;font-weight:700;font-size:12px;cursor:pointer" onclick="reimprRecibo('${g.numero}')">🧾 Recibo</button>
     </div>
   </div>`;
@@ -2749,7 +2805,7 @@ function alterarStatusGuia(numero) {
   const g = GUIAS.find(x=>x.numero===numero);
   if(!g){alert("Guia não encontrada.");return;}
   if(g.status==="Baixada") {
-    alert("🚫 GUIA IMUTÁVEL\n\nEsta guia foi baixada pelo médico "+g.medicoNome+" em "+fmtDH(g.baixadaEm)+".\n\nGuias baixadas pelo médico não podem ser alteradas ou canceladas.e não pode ser alterada.\n\nGuias baixadas são imutáveis.");
+    alert("🚫 GUIA IMUTÁVEL\n\nEsta guia foi baixada pelo médico " + (g.medicoNome||"") + " em " + fmtDH(g.baixadaEm) + ".\n\nGuias baixadas pelo médico não podem ser alteradas ou canceladas.");
     return;
   }
   if(g.status==="Cancelada") {

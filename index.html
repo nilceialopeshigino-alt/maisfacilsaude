@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -222,16 +223,25 @@ const SUPA_HEADERS = {
 
 async function dbGet(tabela, filtros='', ordem='') {
   try {
-    let url = `${SUPA_URL}/rest/v1/${tabela}?select=*`;
-    if (filtros) url += `&${filtros}`;
-    if (ordem) {
-      // Supabase REST aceita: order=coluna.desc ou order=coluna.asc
-      url += `&order=${ordem}`;
+    // Supabase retorna no máximo 1000 por vez — busca em páginas até trazer tudo
+    const PAGE = 1000;
+    let todos = [];
+    let offset = 0;
+    while(true) {
+      let url = `${SUPA_URL}/rest/v1/${tabela}?select=*`;
+      if (filtros) url += `&${filtros}`;
+      if (ordem) url += `&order=${ordem}`;
+      url += `&limit=${PAGE}&offset=${offset}`;
+      const r = await fetch(url, { headers: {...SUPA_HEADERS, 'Prefer': 'count=exact'} });
+      if (!r.ok) { const t=await r.text(); console.error('dbGet error em '+tabela+':', r.status, t); break; }
+      const data = await r.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      todos = todos.concat(data);
+      if (data.length < PAGE) break; // última página
+      offset += PAGE;
     }
-    const r = await fetch(url, { headers: SUPA_HEADERS });
-    if (!r.ok) { const t=await r.text(); console.error('dbGet error em '+tabela+':', r.status, t); return []; }
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
+    console.log(`dbGet ${tabela}: ${todos.length} registros carregados`);
+    return todos;
   } catch(e) { console.error('dbGet exception:', e); return []; }
 }
 

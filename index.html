@@ -460,8 +460,20 @@ async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
 
+  // Auto-adicionar dependente se digitado mas não clicado +
+  const nomeDigitado = el("dep-nome") ? el("dep-nome").value.trim() : "";
+  if(nomeDigitado) {
+    if(!window._DEPS_FORM) window._DEPS_FORM = [];
+    window._DEPS_FORM.push({
+      nome: nomeDigitado,
+      cpf: el("dep-cpf") ? el("dep-cpf").value.trim() : "",
+      nascimento: el("dep-nasc") ? el("dep-nasc").value : ""
+    });
+    el("dep-nome").value = "";
+  }
   const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
   const depsStr = JSON.stringify(depsArray);
+  console.log("📦 Dependentes a salvar:", depsArray.length, JSON.stringify(depsArray));
 
   // Tudo junto num único objeto — titular + dependentes
   const dados = {
@@ -862,6 +874,10 @@ async function abrirFormCli(codigo) {
   })();
   const f = c ? {...c, dependentes:[...depsExistentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
 
+  // Inicializar _DEPS_FORM ANTES de renderizar o HTML
+  window._DEPS_FORM = [...depsExistentes];
+  console.log("🔄 abrirFormCli: depsExistentes =", JSON.stringify(depsExistentes));
+
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
     <h3 style="margin-bottom:20px;font-weight:900">${c?"Editar Beneficiário":"Novo Beneficiário"}</h3>
@@ -909,7 +925,7 @@ async function abrirFormCli(codigo) {
       <button class="btn btn-outline" onclick="renderClientes()">Cancelar</button>
     </div>`;
 
-  window._DEPS_FORM = [...depsExistentes]; // array já convertido de string/JSONB
+  // _DEPS_FORM já inicializado acima, antes do innerHTML
   window._DEPS_FORM_RENDER = () => {
     el("lista-deps").innerHTML = window._DEPS_FORM.map((d,i)=>`<div style="display:flex;gap:8px;align-items:center;background:#f8fafc;border-radius:10px;padding:8px 12px;margin-bottom:8px">
       <div style="flex:1"><div style="font-weight:700">${d.nome}</div><div style="font-size:11px;color:#94a3b8">CPF: ${d.cpf}</div></div>
@@ -922,9 +938,17 @@ window.removerDep = i => { window._DEPS_FORM.splice(i,1); window._DEPS_FORM_REND
 window.addDep = () => {
   const nome=el("dep-nome").value.trim();
   if(!nome){alert("Informe o nome do dependente.");return;}
-  window._DEPS_FORM.push({nome,cpf:el("dep-cpf").value,nascimento:el("dep-nasc").value});
-  el("dep-nome").value="";el("dep-cpf").value="";el("dep-nasc").value="";
+  if(!window._DEPS_FORM) window._DEPS_FORM = [];
+  window._DEPS_FORM.push({
+    nome,
+    cpf: el("dep-cpf").value.trim(),
+    nascimento: el("dep-nasc").value
+  });
+  el("dep-nome").value="";
+  el("dep-cpf").value="";
+  el("dep-nasc").value="";
   window._DEPS_FORM_RENDER();
+  console.log("➕ Dependente adicionado. Total:", window._DEPS_FORM.length, window._DEPS_FORM);
 };
 
 // salvarCli definida acima com Supabase

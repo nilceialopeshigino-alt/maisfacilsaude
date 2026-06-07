@@ -357,7 +357,7 @@ async function carregarDados() {
         vencimento:parseInt(c.vencimento)||10,
         status:c.status||'adimplente', plano:c.plano||'ativo',
         carneAtual:parseInt(c.carne_atual)||1,
-        dependentes:(()=>{const d=c.dependentes;if(Array.isArray(d))return d;if(typeof d==='string'&&d){try{return JSON.parse(d);}catch(e){return[];}}return[];})(),
+        dependentes:[], // preenchido abaixo via tabela dependentes
         dataContrato:c.data_contrato||null
       }));
     }
@@ -386,6 +386,25 @@ async function carregarDados() {
         });
       });
       GC = maxGuiaNum;
+    }
+
+    // ── Buscar dependentes da tabela separada ──
+    try {
+      const todosDepsBanco = await dbGet('dependentes','','codigo_titular');
+      todosDepsBanco.forEach(dep => {
+        const cli = CLIENTES.find(c => c.codigo === dep.codigo_titular);
+        if(cli) {
+          if(!Array.isArray(cli.dependentes)) cli.dependentes = [];
+          cli.dependentes.push({
+            nome: dep.nome||'',
+            cpf: dep.cpf||'',
+            nascimento: dep.nascimento||''
+          });
+        }
+      });
+      console.log('✅ Dependentes carregados da tabela separada');
+    } catch(e) {
+      console.warn('⚠️ Tabela dependentes não encontrada ainda:', e.message);
     }
 
     if(ags.length > 0) {
@@ -453,50 +472,57 @@ async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
 
-  // Capturar dependentes do formulário
-  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
-  // Serializar como string JSON para compatibilidade com coluna TEXT ou JSONB
-  const depsJson = JSON.stringify(depsArray);
-
-  const dados={
-    codigo:novoCod, nome, cpf, rg:el("f-rg").value||null,
-    nascimento:el("f-nasc").value||null, telefone:el("f-tel").value||null,
-    email:el("f-email").value||null, endereco:el("f-end").value||null,
+  // ── PASSO 1: Salvar dados do titular (SEM dependentes) ──
+  const dadosTitular = {
+    codigo:novoCod, nome, cpf,
+    rg:el("f-rg").value||null,
+    nascimento:el("f-nasc").value||null,
+    telefone:el("f-tel").value||null,
+    email:el("f-email").value||null,
+    endereco:el("f-end").value||null,
     mensalidade:parseFloat(el("f-mens").value)||0,
     vencimento:parseInt(el("f-venc").value)||10,
-    status:el("f-status").value, plano:el("f-plano").value,
-    carne_atual:parseInt(el("f-carne").value)||1,
-    dependentes: depsJson
+    status:el("f-status").value,
+    plano:el("f-plano").value,
+    carne_atual:parseInt(el("f-carne").value)||1
   };
 
-  let ok;
+  let okTitular;
   if(codigoOriginal) {
-    ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
+    okTitular = await dbUpdate('clientes','codigo',codigoOriginal,dadosTitular);
   } else {
-    ok = await dbInsert('clientes',dados);
+    okTitular = await dbInsert('clientes',dadosTitular);
   }
-
-  if(!ok && ok !== null) {
-    // ok pode ser [] (array vazio) do Supabase - ainda assim é sucesso
-    // só falha se for explicitamente null
-  }
-  if(ok === null) {
-    alert("❌ Erro ao salvar. Verifique a conexão e tente novamente.");
+  if(okTitular === null) {
+    alert("❌ Erro ao salvar titular. Verifique a conexão.");
     return;
   }
 
-  // Atualizar memória local com array (não string)
-  const clienteLocal = {
-    codigo:novoCod, nome, cpf,
-    rg:dados.rg||'', nascimento:dados.nascimento||'',
-    telefone:dados.telefone||'', email:dados.email||'',
-    endereco:dados.endereco||'',
-    mensalidade:dados.mensalidade, vencimento:dados.vencimento,
-    status:dados.status, plano:dados.plano,
-    carneAtual:dados.carne_atual,
-    dependentes: depsArray  // memória local usa array, banco usa string
-  };
+  // ── PASSO 2: Salvar dependentes na tabela separada ──
+  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
+  const codigoSalvo = novoCod;
 
+  // Apagar dependentes antigos deste titular
+  await dbDelete('dependentes','codigo_titular',codigoSalvo);
+
+  // Inserir os novos dependentes um a um
+  let errosDeps = 0;
+  for(const dep of depsArray) {
+    const r = await dbInsert('dependentes', {
+      codigo_titular: codigoSalvo,
+      nome: dep.nome,
+      cpf: dep.cpf||'',
+      nascimento: dep.nascimento||null
+    });
+    if(r === null) errosDeps++;
+  }
+
+  // ── PASSO 3: Atualizar memória local ──
+  const clienteLocal = {
+    ...dadosTitular,
+    carneAtual: dadosTitular.carne_atual,
+    dependentes: depsArray
+  };
   if(codigoOriginal) {
     const idx = CLIENTES.findIndex(c=>c.codigo===codigoOriginal);
     if(idx>=0) CLIENTES[idx] = clienteLocal;
@@ -506,10 +532,14 @@ async function salvarCli(novoCod, codigoOriginal) {
   }
 
   renderClientes();
-  const msgDeps = depsArray.length > 0
-    ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s): ${depsArray.map(d=>d.nome).join(', ')}`
-    : '';
-  alert("✅ Beneficiário salvo com sucesso!" + msgDeps);
+
+  let msg = "✅ Beneficiário salvo com sucesso!";
+  if(depsArray.length > 0) {
+    msg += errosDeps === 0
+      ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s) salvo(s): ${depsArray.map(d=>d.nome).join(', ')}`
+      : `\n⚠️ ${errosDeps} dependente(s) com erro ao salvar.`;
+  }
+  alert(msg);
 }
 
 // const _salvarContratoOriginal = salvarContrato; [removido - não necessário]

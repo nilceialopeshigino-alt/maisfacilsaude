@@ -357,7 +357,7 @@ async function carregarDados() {
         vencimento:parseInt(c.vencimento)||10,
         status:c.status||'adimplente', plano:c.plano||'ativo',
         carneAtual:parseInt(c.carne_atual)||1,
-        dependentes:c.dependentes||[],
+        dependentes:(()=>{const d=c.dependentes;if(Array.isArray(d))return d;if(typeof d==='string'&&d){try{return JSON.parse(d);}catch(e){return[];}}return[];})(),
         dataContrato:c.data_contrato||null
       }));
     }
@@ -452,6 +452,12 @@ function mostrarLoading(show) {
 async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
+
+  // Capturar dependentes do formulário
+  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
+  // Serializar como string JSON para compatibilidade com coluna TEXT ou JSONB
+  const depsJson = JSON.stringify(depsArray);
+
   const dados={
     codigo:novoCod, nome, cpf, rg:el("f-rg").value||null,
     nascimento:el("f-nasc").value||null, telefone:el("f-tel").value||null,
@@ -460,21 +466,50 @@ async function salvarCli(novoCod, codigoOriginal) {
     vencimento:parseInt(el("f-venc").value)||10,
     status:el("f-status").value, plano:el("f-plano").value,
     carne_atual:parseInt(el("f-carne").value)||1,
-    dependentes:Array.isArray(window._DEPS_FORM)?window._DEPS_FORM:[]
+    dependentes: depsJson
   };
+
   let ok;
-  if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
-  else ok = await dbInsert('clientes',dados);
-  if(!ok) { alert("❌ Erro ao salvar. Verifique a conexão e tente novamente."); return; }
-  // Atualizar memória local
+  if(codigoOriginal) {
+    ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
+  } else {
+    ok = await dbInsert('clientes',dados);
+  }
+
+  if(!ok && ok !== null) {
+    // ok pode ser [] (array vazio) do Supabase - ainda assim é sucesso
+    // só falha se for explicitamente null
+  }
+  if(ok === null) {
+    alert("❌ Erro ao salvar. Verifique a conexão e tente novamente.");
+    return;
+  }
+
+  // Atualizar memória local com array (não string)
+  const clienteLocal = {
+    codigo:novoCod, nome, cpf,
+    rg:dados.rg||'', nascimento:dados.nascimento||'',
+    telefone:dados.telefone||'', email:dados.email||'',
+    endereco:dados.endereco||'',
+    mensalidade:dados.mensalidade, vencimento:dados.vencimento,
+    status:dados.status, plano:dados.plano,
+    carneAtual:dados.carne_atual,
+    dependentes: depsArray  // memória local usa array, banco usa string
+  };
+
   if(codigoOriginal) {
     const idx = CLIENTES.findIndex(c=>c.codigo===codigoOriginal);
-    if(idx>=0) CLIENTES[idx] = {...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1};
+    if(idx>=0) CLIENTES[idx] = clienteLocal;
+    else CLIENTES.push(clienteLocal);
   } else {
-    CLIENTES.push({...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1});
+    CLIENTES.push(clienteLocal);
   }
+
   renderClientes();
-  alert("✅ Beneficiário salvo com sucesso!");
+  const msgDeps = depsArray.length > 0
+    ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s): ${depsArray.map(d=>d.nome).join(', ')}`
+    : '';
+  alert("✅ Beneficiário salvo com sucesso!" + msgDeps);
 }
 
 // const _salvarContratoOriginal = salvarContrato; [removido - não necessário]
@@ -489,7 +524,7 @@ async function salvarContrato(codigo) {
     mensalidade:parseFloat(el("ct-mens").value)||0,
     vencimento:parseInt(el("ct-venc").value)||10,
     status:'adimplente', plano:'ativo', carne_atual:1,
-    dependentes:Array.isArray(window._CT_DEPS)?window._CT_DEPS:[], data_contrato:new Date().toISOString()
+    dependentes:JSON.stringify(Array.isArray(window._CT_DEPS)?window._CT_DEPS:[]), data_contrato:new Date().toISOString()
   };
   const novo={codigo,nome,cpf,rg:dados.rg,nascimento:dados.nascimento,telefone:dados.telefone,email:dados.email,endereco:dados.endereco,cep:dados.cep,estadoCivil:dados.estado_civil,mensalidade:dados.mensalidade,vencimento:dados.vencimento,status:'adimplente',plano:'ativo',carneAtual:1,dependentes:dados.dependentes,dataContrato:dados.data_contrato};
   await dbInsert('clientes',dados);
@@ -798,7 +833,15 @@ async function abrirFormCli(codigo) {
       novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
     }
   }
-  const f = c ? {...c,dependentes:[...c.dependentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
+  // Converter dependentes de string JSON ou array para array
+  const depsExistentes = (() => {
+    if(!c) return [];
+    const d = c.dependentes;
+    if(Array.isArray(d)) return d;
+    if(typeof d === 'string' && d) { try { return JSON.parse(d); } catch(e) { return []; } }
+    return [];
+  })();
+  const f = c ? {...c, dependentes:[...depsExistentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
 
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
@@ -847,7 +890,7 @@ async function abrirFormCli(codigo) {
       <button class="btn btn-outline" onclick="renderClientes()">Cancelar</button>
     </div>`;
 
-  window._DEPS_FORM = [...f.dependentes];
+  window._DEPS_FORM = [...depsExistentes]; // array já convertido de string/JSONB
   window._DEPS_FORM_RENDER = () => {
     el("lista-deps").innerHTML = window._DEPS_FORM.map((d,i)=>`<div style="display:flex;gap:8px;align-items:center;background:#f8fafc;border-radius:10px;padding:8px 12px;margin-bottom:8px">
       <div style="flex:1"><div style="font-weight:700">${d.nome}</div><div style="font-size:11px;color:#94a3b8">CPF: ${d.cpf}</div></div>

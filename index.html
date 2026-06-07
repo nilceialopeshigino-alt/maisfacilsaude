@@ -783,7 +783,7 @@ function renderClientes(busca="",filtro="todos") {
             <div style="width:46px;height:46px;border-radius:12px;background:${c.status==="adimplente"?"#dcfce7":"#fee2e2"};display:flex;align-items:center;justify-content:center;font-size:22px">${c.status==="adimplente"?"✅":"⚠️"}</div>
             <div>
               <div style="font-weight:800;font-size:15px">${c.nome}</div>
-              <div style="font-size:12px;color:#64748b"><span style="font-family:monospace;font-weight:700;color:#0e7490">${c.codigo}</span> • ${c.cpf} • ${c.dependentes.length} dep. • vence dia ${c.vencimento}</div>
+              <div style="font-size:12px;color:#64748b"><span style="font-family:monospace;font-weight:700;color:#0e7490">${c.codigo}</span> • ${c.cpf} • ${parseDeps(c.dependentes).length} dep. • vence dia ${c.vencimento}</div>
               ${c.carneAtual>=11?'<div style="font-size:11px;font-weight:800;color:#d97706">⚠️ Emitir novo carnê</div>':""}
             </div>
           </div>
@@ -799,10 +799,16 @@ function renderClientes(busca="",filtro="todos") {
     </div>`;
 }
 
+function parseDeps(d) {
+  if(Array.isArray(d)) return d;
+  if(typeof d==='string' && d && d!=='null') { try{return JSON.parse(d);}catch(e){return[];} }
+  return [];
+}
+
 function verCli(codigo) {
   const c = CLIENTES.find(x=>x.codigo===codigo);
   if(!c){alert("Cliente não encontrado.");renderClientes();return;}
-  if(!c.dependentes) c.dependentes = [];
+  c.dependentes = parseDeps(c.dependentes);
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
     <div style="background:linear-gradient(135deg,#0c4a6e,#0e7490);border-radius:16px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
@@ -1034,7 +1040,7 @@ window.addDepContrato = () => {
 function imprimirContrato(codigo, dadosPassados) {
   const c = dadosPassados || CLIENTES.find(x=>x.codigo===codigo);
   if(!c){alert("Cliente não encontrado.");return;}
-  if(!c.dependentes) c.dependentes = [];
+  c.dependentes = parseDeps(c.dependentes);
   const dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   const logoHtml = LOGO_URL ? `<img src="${LOGO_URL}" style="height:70px;object-fit:contain;">` : `<div style="font-family:Arial,sans-serif;font-weight:900;font-size:22px;color:#000">MAIS FÁCIL SAÚDE</div>`;
 
@@ -1319,7 +1325,7 @@ function buscarCliGuia() {
   if(!c){msg.innerHTML='<div class="alert alert-red"><span>❌</span><span style="color:#991b1b;font-weight:700">Não encontrado. Tente MFS00001 ou MFS00003.</span></div>';GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";el("ng-hint").style.display="block";return;}
   if(c.plano==="cancelado"){msg.innerHTML='<div class="alert alert-red"><span>❌</span><span style="color:#991b1b;font-weight:700">Plano cancelado.</span></div>';GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";return;}
   if(c.status==="inadimplente"){msg.innerHTML=`<div class="alert alert-yellow"><span>⚠️</span><span style="color:#92400e;font-weight:700">${c.nome} está INADIMPLENTE. Regularize antes de emitir.</span></div>`;GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";return;}
-  GUIA_CLI_OK = c;
+  c.dependentes = parseDeps(c.dependentes); GUIA_CLI_OK = c;
   msg.innerHTML='<div class="alert alert-green"><span>✅</span><span style="color:#166534;font-weight:700">'+c.nome+' — adimplente.</span></div>';
   el("ng-hint").style.display="none";
   el("ng-cli-info").style.display="block";

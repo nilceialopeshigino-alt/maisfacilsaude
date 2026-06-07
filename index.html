@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -195,14 +194,31 @@ const ANO_ATUAL = hoje.getFullYear();
 const fmt = v => (parseFloat(v)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 const fmtDH = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
-const novoNum = () => {
-  const maxLocal = GUIAS.reduce((max, g) => {
-    const n = parseInt((g.numero||'').replace('GUI',''))||0;
-    return n > max ? n : max;
-  }, GC);
-  GC = maxLocal + 1;
-  return "GUI"+String(GC).padStart(6,"0");
-};
+// novoNum: busca o maior número DIRETAMENTE no banco
+// Garante unicidade mesmo se banco estava offline ao carregar
+async function novoNum() {
+  try {
+    // Busca a última guia no banco (ordenada decrescente)
+    const url = `${SUPA_URL}/rest/v1/guias?select=numero&order=numero.desc&limit=1`;
+    const r = await fetch(url, { headers: SUPA_HEADERS });
+    if (r.ok) {
+      const data = await r.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const ultimo = parseInt((data[0].numero||'').replace('GUI',''))||0;
+        const proximo = ultimo + 1;
+        GC = proximo;
+        return 'GUI' + String(proximo).padStart(6, '0');
+      }
+    }
+  } catch(e) {
+    console.warn('novoNum: erro ao consultar banco, usando GC local', e);
+  }
+  // Fallback: usa GC local (que foi carregado do banco no início)
+  GC = Math.max(GC, 1001);
+  const n = GC;
+  GC++;
+  return 'GUI' + String(n).padStart(6, '0');
+}
 const el = id => document.getElementById(id);
 const chip = (label, cor) => `<span class="chip" style="background:${cor}22;color:${cor}">${label}</span>`;
 const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -926,22 +942,8 @@ window.addDepContrato = () => {
   window._CT_RENDER_DEPS();
 };
 
-function salvarContrato(codigo) {
-  const nome=el("ct-nome").value.trim(), cpf=el("ct-cpf").value.trim();
-  if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
-  const novo={
-    codigo, nome, cpf, rg:el("ct-rg").value, nascimento:el("ct-nasc").value,
-    telefone:el("ct-tel").value, email:el("ct-email").value, endereco:el("ct-end").value,
-    cep:el("ct-cep").value, estadoCivil:el("ct-ecivil").value,
-    mensalidade:parseFloat(el("ct-mens").value)||0, vencimento:parseInt(el("ct-venc").value)||10,
-    status:"adimplente", plano:"ativo", carneAtual:1,
-    dependentes:[...(window._CT_DEPS||[])], dataContrato:new Date().toISOString(),
-  };
-  CLIENTES.push(novo);
-  imprimirContrato(codigo, novo);
-  renderClientes();
-  alert("✅ Cliente "+codigo+" cadastrado!\n\n⚠️ LEMBRE-SE: Emitir o carnê de pagamento para este cliente.");
-}
+// salvarContrato definitivo com banco — definido acima na linha ~464
+// esta versão local foi removida para evitar conflito
 
 function imprimirContrato(codigo, dadosPassados) {
   const c = dadosPassados || CLIENTES.find(x=>x.codigo===codigo);
@@ -1248,7 +1250,7 @@ function mostrarEndMedico() {
   else el("ng-end-med").style.display="none";
 }
 
-function emitirGuia() {
+async function emitirGuia() {
   if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
   const medId=el("ng-medico").value;
   if(!medId){alert("Selecione o médico.");return;}
@@ -1258,7 +1260,7 @@ function emitirGuia() {
   const tipoAt=el("ng-paciente").value;
   const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
   const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(dataHora).getMonth()+1;
   const anoAt=new Date(dataHora).getFullYear();
 
@@ -2566,14 +2568,14 @@ function excluirAgenda(id) {
   renderAgenda();
 }
 
-function emitirGuiaAgenda(id) {
+async function emitirGuiaAgenda(id) {
   const a=AGENDA.find(x=>x.id===id);
   if(!a){alert("Agendamento não encontrado.");return;}
   // Verifica se é beneficiário MFS e se está inadimplente
   const c=a.codigoMFS?CLIENTES.find(x=>x.codigo===a.codigoMFS):null;
   if(c&&c.status==="inadimplente"){alert("⚠️ Cliente INADIMPLENTE. Regularize antes de emitir a guia.");return;}
   const med=MEDICOS.find(m=>m.id===a.medicoId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(a.dataHora).getMonth()+1;
   const anoAt=new Date(a.dataHora).getFullYear();
   const nova={
@@ -2599,7 +2601,7 @@ function emitirGuiaAgenda(id) {
 
 // ── SAVE GUIA NO BANCO ──
 const _emitirGuiaOriginal = emitirGuia;
-async function emitirGuia() {
+async async function emitirGuia() {
   if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
   const medId=el("ng-medico").value;
   if(!medId){alert("Selecione o médico.");return;}
@@ -2609,7 +2611,7 @@ async function emitirGuia() {
   const tipoAt=el("ng-paciente").value;
   const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
   const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(dataHora).getMonth()+1;
   const anoAt=new Date(dataHora).getFullYear();
 
@@ -2939,7 +2941,7 @@ window._emitirGuiaV2 = async function() {
   const tipoAt=el("ng-paciente").value;
   const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
   const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(dataHora).getMonth()+1;
   const anoAt=new Date(dataHora).getFullYear();
 

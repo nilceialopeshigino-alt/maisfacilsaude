@@ -194,30 +194,24 @@ const ANO_ATUAL = hoje.getFullYear();
 const fmt = v => (parseFloat(v)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 const fmtDH = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
-// novoNum: busca o maior número DIRETAMENTE no banco
-// Garante unicidade mesmo se banco estava offline ao carregar
+// novoNum: NÃO gera número — o banco gera via sequence
+// Esta função existe apenas para compatibilidade — não é mais chamada
+// O número vem do retorno do dbInsert (campo 'numero' retornado pelo banco)
 async function novoNum() {
+  // DEPRECATED: número gerado pelo banco. Ver emitirGuia e emitirGuiaAgenda.
+  console.warn("novoNum() chamada — deveria ser gerado pelo banco");
+  const url = `${SUPA_URL}/rest/v1/guias?select=numero&order=numero.desc&limit=1`;
   try {
-    // Busca a última guia no banco (ordenada decrescente)
-    const url = `${SUPA_URL}/rest/v1/guias?select=numero&order=numero.desc&limit=1`;
     const r = await fetch(url, { headers: SUPA_HEADERS });
-    if (r.ok) {
-      const data = await r.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const ultimo = parseInt((data[0].numero||'').replace('GUI',''))||0;
-        const proximo = ultimo + 1;
-        GC = proximo;
-        return 'GUI' + String(proximo).padStart(6, '0');
+    if(r.ok) {
+      const d = await r.json();
+      if(Array.isArray(d) && d.length > 0) {
+        const ult = parseInt((d[0].numero||'').replace('GUI',''))||0;
+        return 'GUI' + String(ult+1).padStart(6,'0');
       }
     }
-  } catch(e) {
-    console.warn('novoNum: erro ao consultar banco, usando GC local', e);
-  }
-  // Fallback: usa GC local (que foi carregado do banco no início)
-  GC = Math.max(GC, 1001);
-  const n = GC;
-  GC++;
-  return 'GUI' + String(n).padStart(6, '0');
+  } catch(e) {}
+  return 'GUI' + String(Date.now()).slice(-6);
 }
 const el = id => document.getElementById(id);
 const chip = (label, cor) => `<span class="chip" style="background:${cor}22;color:${cor}">${label}</span>`;
@@ -1342,44 +1336,7 @@ function mostrarEndMedico() {
   else el("ng-end-med").style.display="none";
 }
 
-async function emitirGuia() {
-  if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
-  const medId=el("ng-medico").value;
-  if(!medId){alert("Selecione o médico.");return;}
-  const dataHora=el("ng-data").value;
-  if(!dataHora){alert("Informe data e hora.");return;}
-
-  const tipoAt=el("ng-paciente").value;
-  const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
-  const med=MEDICOS.find(m=>m.id===medId);
-  const numero=await novoNum();
-  const mesAt=new Date(dataHora).getMonth()+1;
-  const anoAt=new Date(dataHora).getFullYear();
-
-  const nova={
-    numero, codigoCliente:GUIA_CLI_OK.codigo,
-    nomePaciente:paciente?paciente.nome:GUIA_CLI_OK.nome,
-    cpfPaciente:paciente?paciente.cpf:GUIA_CLI_OK.cpf,
-    tipoAtendimento:tipoAt, medicoId:medId, medicoNome:med?med.nome:"",
-    especialidade:med?med.especialidade:"", enderecoAtendimento:med?med.endereco:"",
-    dataHora, tipoServico:el("ng-tipo").value,
-    valorConsulta:parseFloat(el("ng-vc").value)||0,
-    valorRepasse:parseFloat(el("ng-vr").value)||0,
-    valorPago:parseFloat(el("ng-vp").value)||0,
-    formaPagamento:el("ng-fp").value,
-    emitidaEm:new Date().toISOString(), status:"Emitida",
-    mesAtendimento:mesAt, anoAtendimento:anoAt,
-    mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
-  };
-
-  GUIAS.unshift(nova);
-  GUIA_TELA="lista";
-  renderGuias();
-  setTimeout(()=>{
-    imprimirGuiaPDF(nova, med, paciente);
-    setTimeout(()=>imprimirReciboPDF(nova, med, paciente),800);
-  },300);
-}
+// emitirGuia sem banco removida — usar apenas a versão com banco abaixo
 
 function reimprGuia(numero) {
   const g=GUIAS.find(x=>x.numero===numero);
@@ -2680,15 +2637,33 @@ async function emitirGuiaAgenda(id) {
     mesAtendimento:mesAt, anoAtendimento:anoAt,
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
+  // Salvar no banco — NÃO manda 'numero', o banco gera
+  const resAgenda = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
+    nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
+    tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
+    medico_nome:nova.medicoNome, especialidade:nova.especialidade,
+    endereco_atendimento:nova.enderecoAtendimento, data_hora:nova.dataHora,
+    tipo_servico:nova.tipoServico, valor_consulta:nova.valorConsulta,
+    valor_repasse:nova.valorRepasse, valor_pago:nova.valorPago,
+    forma_pagamento:"", emitida_em:nova.emitidaEm,
+    status:nova.status, mes_atendimento:nova.mesAtendimento,
+    ano_atendimento:nova.anoAtendimento, mes_repasse:nova.mesRepasse,
+    ano_repasse:nova.anoRepasse
+  });
+  if(!resAgenda) { alert("❌ Erro ao salvar guia no banco."); return; }
+  const numFinalAgenda = Array.isArray(resAgenda) ? resAgenda[0]?.numero : resAgenda?.numero;
+  if(numFinalAgenda) nova.numero = numFinalAgenda;
+  console.log("✅ Guia agenda salva com número:", nova.numero);
+
   GUIAS.unshift(nova);
-  // Atualiza status agenda
   const idx=AGENDA.findIndex(x=>x.id===id);
   if(idx>=0) AGENDA[idx].status="Guia Emitida";
+  await dbUpdate('agenda','id',id,{status:'Guia Emitida'});
   renderAgenda();
-  // Imprime guia e recibo
-  const pac={nome:a.nomePaciente,cpf:a.cpf||c.cpf};
+  const pac={nome:a.nomePaciente,cpf:a.cpf||(c?c.cpf:"")};
   setTimeout(()=>{ imprimirGuiaPDF(nova,med,pac); setTimeout(()=>imprimirReciboPDF(nova,med,pac),800); },300);
-  alert("✅ Guia "+numero+" emitida com sucesso!");
+  alert("✅ Guia "+nova.numero+" emitida com sucesso!");
 }
 
 // ── SAVE GUIA NO BANCO ──
@@ -2723,9 +2698,9 @@ async function emitirGuia() {
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
 
-  // Salvar no banco
-  await dbInsert('guias', {
-    numero:nova.numero, codigo_cliente:nova.codigoCliente,
+  // Salvar no banco — NÃO manda 'numero', o banco gera via sequence
+  const resultado = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
     nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
     tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
     medico_nome:nova.medicoNome, especialidade:nova.especialidade,
@@ -2737,6 +2712,13 @@ async function emitirGuia() {
     ano_atendimento:nova.anoAtendimento, mes_repasse:nova.mesRepasse,
     ano_repasse:nova.anoRepasse
   });
+
+  if(!resultado) { alert("❌ Erro ao salvar guia no banco."); return; }
+
+  // Número definitivo vem do banco
+  const numeroFinal = Array.isArray(resultado) ? resultado[0]?.numero : resultado?.numero;
+  if(numeroFinal) nova.numero = numeroFinal;
+  console.log("✅ Guia salva no banco com número:", nova.numero);
 
   GUIAS.unshift(nova);
   GUIA_TELA="lista";
@@ -3053,8 +3035,9 @@ window._emitirGuiaV2 = async function() {
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
 
-  await dbInsert('guias', {
-    numero:nova.numero, codigo_cliente:nova.codigoCliente,
+  // Salvar no banco — NÃO manda 'numero', banco gera via sequence
+  const resV2 = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
     nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
     tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
     medico_nome:nova.medicoNome, especialidade:nova.especialidade,
@@ -3066,6 +3049,10 @@ window._emitirGuiaV2 = async function() {
     mes_atendimento:nova.mesAtendimento, ano_atendimento:nova.anoAtendimento,
     mes_repasse:nova.mesRepasse, ano_repasse:nova.anoRepasse
   });
+  if(!resV2) { alert("❌ Erro ao salvar guia no banco."); return; }
+  const numV2 = Array.isArray(resV2) ? resV2[0]?.numero : resV2?.numero;
+  if(numV2) nova.numero = numV2;
+  console.log("✅ Guia V2 salva com número:", nova.numero);
 
   GUIAS.unshift(nova);
   GUIA_TELA="lista";

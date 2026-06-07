@@ -357,7 +357,14 @@ async function carregarDados() {
         vencimento:parseInt(c.vencimento)||10,
         status:c.status||'adimplente', plano:c.plano||'ativo',
         carneAtual:parseInt(c.carne_atual)||1,
-        dependentes:[], // preenchido abaixo via tabela dependentes
+        dependentes:(()=>{
+          const d=c.dependentes;
+          if(Array.isArray(d)) return d;
+          if(typeof d==='string' && d && d!=='[]' && d!=='null'){
+            try{return JSON.parse(d);}catch(e){return [];}
+          }
+          return [];
+        })(),
         dataContrato:c.data_contrato||null
       }));
     }
@@ -386,25 +393,6 @@ async function carregarDados() {
         });
       });
       GC = maxGuiaNum;
-    }
-
-    // ── Buscar dependentes da tabela separada ──
-    try {
-      const todosDepsBanco = await dbGet('dependentes','','codigo_titular');
-      todosDepsBanco.forEach(dep => {
-        const cli = CLIENTES.find(c => c.codigo === dep.codigo_titular);
-        if(cli) {
-          if(!Array.isArray(cli.dependentes)) cli.dependentes = [];
-          cli.dependentes.push({
-            nome: dep.nome||'',
-            cpf: dep.cpf||'',
-            nascimento: dep.nascimento||''
-          });
-        }
-      });
-      console.log('✅ Dependentes carregados da tabela separada');
-    } catch(e) {
-      console.warn('⚠️ Tabela dependentes não encontrada ainda:', e.message);
     }
 
     if(ags.length > 0) {
@@ -472,8 +460,11 @@ async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
 
-  // ── PASSO 1: Salvar dados do titular (SEM dependentes) ──
-  const dadosTitular = {
+  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
+  const depsStr = JSON.stringify(depsArray);
+
+  // Tudo junto num único objeto — titular + dependentes
+  const dados = {
     codigo:novoCod, nome, cpf,
     rg:el("f-rg").value||null,
     nascimento:el("f-nasc").value||null,
@@ -484,44 +475,46 @@ async function salvarCli(novoCod, codigoOriginal) {
     vencimento:parseInt(el("f-venc").value)||10,
     status:el("f-status").value,
     plano:el("f-plano").value,
-    carne_atual:parseInt(el("f-carne").value)||1
+    carne_atual:parseInt(el("f-carne").value)||1,
+    dependentes: depsStr
   };
 
-  let okTitular;
+  // Salvar no banco
+  let ok;
   if(codigoOriginal) {
-    okTitular = await dbUpdate('clientes','codigo',codigoOriginal,dadosTitular);
+    ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
   } else {
-    okTitular = await dbInsert('clientes',dadosTitular);
+    ok = await dbInsert('clientes',dados);
   }
-  if(okTitular === null) {
-    alert("❌ Erro ao salvar titular. Verifique a conexão.");
+  if(ok === null) {
+    alert("❌ Erro ao salvar. Verifique a conexão.");
     return;
   }
 
-  // ── PASSO 2: Salvar dependentes na tabela separada ──
-  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
-  const codigoSalvo = novoCod;
-
-  // Apagar dependentes antigos deste titular
-  await dbDelete('dependentes','codigo_titular',codigoSalvo);
-
-  // Inserir os novos dependentes um a um
-  let errosDeps = 0;
-  for(const dep of depsArray) {
-    const r = await dbInsert('dependentes', {
-      codigo_titular: codigoSalvo,
-      nome: dep.nome,
-      cpf: dep.cpf||'',
-      nascimento: dep.nascimento||null
+  // Se a resposta do banco não incluiu dependentes (coluna pode não existir),
+  // fazer um segundo PATCH só com dependentes usando fetch direto
+  try {
+    const cod = encodeURIComponent(novoCod);
+    const r2 = await fetch(`${SUPA_URL}/rest/v1/clientes?codigo=eq.${cod}`, {
+      method: 'PATCH',
+      headers: SUPA_HEADERS,
+      body: JSON.stringify({ dependentes: depsStr })
     });
-    if(r === null) errosDeps++;
+    if(!r2.ok) {
+      const err = await r2.text();
+      console.warn('PATCH dependentes retornou:', r2.status, err);
+    } else {
+      console.log('✅ dependentes salvos:', depsStr);
+    }
+  } catch(e) {
+    console.warn('Erro no PATCH dependentes:', e);
   }
 
-  // ── PASSO 3: Atualizar memória local ──
+  // Atualizar memória local
   const clienteLocal = {
-    ...dadosTitular,
-    carneAtual: dadosTitular.carne_atual,
-    dependentes: depsArray
+    ...dados,
+    carneAtual: dados.carne_atual,
+    dependentes: depsArray  // memória usa array
   };
   if(codigoOriginal) {
     const idx = CLIENTES.findIndex(c=>c.codigo===codigoOriginal);
@@ -532,14 +525,10 @@ async function salvarCli(novoCod, codigoOriginal) {
   }
 
   renderClientes();
-
-  let msg = "✅ Beneficiário salvo com sucesso!";
-  if(depsArray.length > 0) {
-    msg += errosDeps === 0
-      ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s) salvo(s): ${depsArray.map(d=>d.nome).join(', ')}`
-      : `\n⚠️ ${errosDeps} dependente(s) com erro ao salvar.`;
-  }
-  alert(msg);
+  const msgDeps = depsArray.length > 0
+    ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s): ${depsArray.map(d=>d.nome).join(', ')}`
+    : '';
+  alert("✅ Beneficiário salvo!" + msgDeps);
 }
 
 // const _salvarContratoOriginal = salvarContrato; [removido - não necessário]

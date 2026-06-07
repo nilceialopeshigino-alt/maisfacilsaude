@@ -448,7 +448,7 @@ function mostrarLoading(show) {
 }
 
 // ── WRAPPERS COM SUPABASE ──
-const _salvarCliOriginal = salvarCli;
+// const _salvarCliOriginal = salvarCli; [removido - não necessário]
 async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
@@ -477,7 +477,7 @@ async function salvarCli(novoCod, codigoOriginal) {
   alert("✅ Beneficiário salvo com sucesso!");
 }
 
-const _salvarContratoOriginal = salvarContrato;
+// const _salvarContratoOriginal = salvarContrato; [removido - não necessário]
 async function salvarContrato(codigo) {
   const nome=el("ct-nome").value.trim(), cpf=el("ct-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
@@ -2600,8 +2600,8 @@ async function emitirGuiaAgenda(id) {
 }
 
 // ── SAVE GUIA NO BANCO ──
-const _emitirGuiaOriginal = emitirGuia;
-async async function emitirGuia() {
+// const _emitirGuiaOriginal = emitirGuia; [removido - não necessário]
+async function emitirGuia() {
   if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
   const medId=el("ng-medico").value;
   if(!medId){alert("Selecione o médico.");return;}

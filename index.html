@@ -1338,6 +1338,23 @@ function mostrarEndMedico() {
 
 // emitirGuia sem banco removida — usar apenas a versão com banco abaixo
 
+function reimprGuiaAgenda(agId) {
+  // Busca a guia mais recente do paciente desta agenda
+  const a = AGENDA.find(x=>x.id===agId);
+  if(!a){alert("Agendamento não encontrado.");return;}
+  // Buscar no array GUIAS pela guia mais recente deste paciente
+  const guia = GUIAS.find(g=>g.nomePaciente===a.nomePaciente && g.status==="Emitida")
+             || GUIAS.find(g=>g.nomePaciente===a.nomePaciente);
+  if(!guia){
+    alert("Guia não encontrada. Tente emitir novamente.");
+    return;
+  }
+  const med = MEDICOS.find(m=>m.id===guia.medicoId)
+           || {nome:guia.medicoNome||a.medicoNome||"", especialidade:guia.especialidade||"", endereco:guia.enderecoAtendimento||""};
+  const pac = {nome:guia.nomePaciente, cpf:guia.cpfPaciente};
+  imprimirGuiaPDF(guia, med, pac);
+}
+
 function reimprGuia(numero) {
   const g=GUIAS.find(x=>x.numero===numero);
   const med=MEDICOS.find(m=>m.id===g.medicoId);
@@ -2351,7 +2368,10 @@ function renderAgenda() {
                   <td style="text-align:center">
                     <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
                       <button onclick="editarAgenda(${a.id})" style="padding:5px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;font-weight:700;cursor:pointer">✏️</button>
-                      <button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>
+                      ${a.status==="Guia Emitida"
+                        ? `<button onclick="reimprGuiaAgenda(${a.id})" style="padding:5px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;font-weight:700;cursor:pointer">🖨️ Guia</button>`
+                        : `<button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>`
+                      }
                       <button onclick="excluirAgenda(${a.id})" style="padding:5px 10px;background:#fee2e2;border:none;border-radius:6px;color:#dc2626;font-size:11px;cursor:pointer">✕</button>
                     </div>
                   </td>
@@ -2623,14 +2643,18 @@ async function emitirGuiaAgenda(id) {
   // Verifica se é beneficiário MFS e se está inadimplente
   const c=a.codigoMFS?CLIENTES.find(x=>x.codigo===a.codigoMFS):null;
   if(c&&c.status==="inadimplente"){alert("⚠️ Cliente INADIMPLENTE. Regularize antes de emitir a guia.");return;}
-  const med=MEDICOS.find(m=>m.id===a.medicoId);
+  // med pode ser null para médicos externos (outros convênios)
+  const med=MEDICOS.find(m=>m.id===a.medicoId)||null;
+  const medNome = med?.nome || a.medicoNome || a.medicoExterno || "Médico Externo";
+  const medEndereco = med?.endereco || a.enderecoMedico || "";
+  const medEsp = med?.especialidade || "";
   const numero=await novoNum();
   const mesAt=new Date(a.dataHora).getMonth()+1;
   const anoAt=new Date(a.dataHora).getFullYear();
   const nova={
     numero, codigoCliente:c?c.codigo:"PART", nomePaciente:a.nomePaciente, cpfPaciente:a.cpf||(c?c.cpf:""),
-    tipoAtendimento:"titular", medicoId:a.medicoId, medicoNome:a.medicoNome,
-    especialidade:med?med.especialidade:"", enderecoAtendimento:a.enderecoMedico||med?.endereco||"",
+    tipoAtendimento:"titular", medicoId:a.medicoId||"", medicoNome:medNome,
+    especialidade:medEsp, enderecoAtendimento:medEndereco,
     dataHora:a.dataHora, tipoServico:a.tipoServico,
     valorConsulta:a.valorConsulta, valorRepasse:a.valorRepasse, valorPago:a.valorConsulta,
     formaPagamento:"", emitidaEm:new Date().toISOString(), status:"Emitida",
@@ -2662,7 +2686,9 @@ async function emitirGuiaAgenda(id) {
   await dbUpdate('agenda','id',id,{status:'Guia Emitida'});
   renderAgenda();
   const pac={nome:a.nomePaciente,cpf:a.cpf||(c?c.cpf:"")};
-  setTimeout(()=>{ imprimirGuiaPDF(nova,med,pac); setTimeout(()=>imprimirReciboPDF(nova,med,pac),800); },300);
+  // Criar objeto med simulado para convenios externos
+  const medParaImprimir = med || {nome:medNome, especialidade:medEsp, endereco:medEndereco};
+  setTimeout(()=>{ imprimirGuiaPDF(nova,medParaImprimir,pac); setTimeout(()=>imprimirReciboPDF(nova,medParaImprimir,pac),800); },300);
   alert("✅ Guia "+nova.numero+" emitida com sucesso!");
 }
 

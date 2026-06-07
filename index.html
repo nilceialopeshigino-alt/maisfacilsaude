@@ -566,7 +566,18 @@ function fazerLogin() {
   el("login-error").classList.add("hidden");
 
   if(user === "clinica" && pass === "admin123") {
-    LOGIN = {tipo:"clinica", nome:"Clínica Mais Fácil Saúde"};
+    LOGIN = {tipo:"clinica", nome:"Clínica Mais Fácil Saúde", operador:"Administrador"};
+    iniciarApp();
+    return;
+  }
+  // Funcionárias
+  const FUNCIONARIAS = [
+    {usuario:"priscilla", senha:"1234", nome:"Priscilla Zani"},
+    {usuario:"alessandra", senha:"1234", nome:"Alessandra Chad"},
+  ];
+  const func = FUNCIONARIAS.find(f => f.usuario === user && f.senha === pass);
+  if(func) {
+    LOGIN = {tipo:"clinica", nome:func.nome, operador:func.nome};
     iniciarApp();
     return;
   }
@@ -587,12 +598,12 @@ async function iniciarApp() {
   el("login-screen").classList.add("hidden");
   el("app-screen").classList.remove("hidden");
   await carregarDados();
-  el("user-name").textContent = LOGIN.tipo==="clinica" ? "Clínica" : LOGIN.medico.nome;
-  el("user-role").textContent = LOGIN.tipo==="clinica" ? "Administrador" : LOGIN.medico.especialidade;
-  // Esconder diagnóstico para médicos
+  el("user-name").textContent = LOGIN.tipo==="clinica" ? (LOGIN.nome||"Clínica") : LOGIN.medico.nome;
+  el("user-role").textContent = LOGIN.tipo==="clinica" ? (LOGIN.operador==="Administrador"?"Administrador":"Funcionária") : LOGIN.medico.especialidade;
+  // Esconder diagnóstico para médicos e funcionárias (só admin vê)
   const btnDiag = el("btn-diagnostico");
-  if(btnDiag) btnDiag.style.display = LOGIN.tipo==="clinica" ? "" : "none";
-  el("user-icon").textContent = LOGIN.tipo==="clinica" ? "🏥" : "👨‍⚕️";
+  if(btnDiag) btnDiag.style.display = (LOGIN.tipo==="clinica" && LOGIN.operador==="Administrador") ? "" : "none";
+  el("user-icon").textContent = LOGIN.tipo==="clinica" ? (LOGIN.operador==="Administrador"?"🏥":"👩‍💼") : "👨‍⚕️";
 
   if(LOGIN.tipo === "medico") {
     el("tabs-clinica").classList.add("hidden");
@@ -3075,6 +3086,7 @@ window._emitirGuiaV2 = async function() {
     valor_repasse:nova.valorRepasse, valor_pago:nova.valorPago,
     forma_pagamento:nova.formaPagamento, info_complementar:infoComp,
     emitida_em:nova.emitidaEm, status:nova.status,
+    operador: LOGIN?.operador || LOGIN?.nome || "Clínica",
     mes_atendimento:nova.mesAtendimento, ano_atendimento:nova.anoAtendimento,
     mes_repasse:nova.mesRepasse, ano_repasse:nova.anoRepasse
   });

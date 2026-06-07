@@ -144,7 +144,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
           </div>
         </div>
         <button class="btn-sair no-print" onclick="sair()">Sair →</button>
-        <button class="btn-sair no-print" onclick="diagnosticarBanco()" style="background:rgba(217,119,6,.25);border-color:rgba(217,119,6,.4);color:#fcd34d">🔍 Diagnóstico</button>
+        <button id="btn-diagnostico" class="btn-sair no-print" onclick="diagnosticarBanco()" style="background:rgba(217,119,6,.25);border-color:rgba(217,119,6,.4);color:#fcd34d">🔍 Diagnóstico</button>
       </div>
     </div>
     <div class="tabs" id="tabs-clinica">
@@ -589,6 +589,9 @@ async function iniciarApp() {
   await carregarDados();
   el("user-name").textContent = LOGIN.tipo==="clinica" ? "Clínica" : LOGIN.medico.nome;
   el("user-role").textContent = LOGIN.tipo==="clinica" ? "Administrador" : LOGIN.medico.especialidade;
+  // Esconder diagnóstico para médicos
+  const btnDiag = el("btn-diagnostico");
+  if(btnDiag) btnDiag.style.display = LOGIN.tipo==="clinica" ? "" : "none";
   el("user-icon").textContent = LOGIN.tipo==="clinica" ? "🏥" : "👨‍⚕️";
 
   if(LOGIN.tipo === "medico") {

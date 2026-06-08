@@ -560,16 +560,18 @@ async function salvarContrato(codigo) {
 }
 
 // ── LOGIN ──
-function fazerLogin() {
+async function fazerLogin() {
   const user = el("login-user").value.trim().toLowerCase();
   const pass = el("login-pass").value;
   el("login-error").classList.add("hidden");
 
+  // Clínica admin
   if(user === "clinica" && pass === "admin123") {
     LOGIN = {tipo:"clinica", nome:"Clínica Mais Fácil Saúde", operador:"Administrador"};
     iniciarApp();
     return;
   }
+
   // Funcionárias
   const FUNCIONARIAS = [
     {usuario:"priscilla", senha:"1234", nome:"Priscilla Zani"},
@@ -581,12 +583,22 @@ function fazerLogin() {
     iniciarApp();
     return;
   }
-  const med = MEDICOS.find(m => m.id.toLowerCase() === user && m.senha === pass);
+
+  // Médico — buscar do banco se MEDICOS ainda não carregou
+  let listaMed = MEDICOS && MEDICOS.length > 0 ? MEDICOS : [];
+  if(listaMed.length === 0) {
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/medicos?select=*`, {headers: SUPA_HEADERS});
+      if(r.ok) listaMed = await r.json();
+    } catch(e) { console.warn("Erro ao buscar médicos no login:", e); }
+  }
+  const med = listaMed.find(m => (m.id||"").toLowerCase() === user && m.senha === pass);
   if(med) {
     LOGIN = {tipo:"medico", medico:med};
     iniciarApp();
     return;
   }
+
   el("login-error").textContent = "❌ Usuário ou senha incorretos. Tente novamente.";
   el("login-error").classList.remove("hidden");
 }

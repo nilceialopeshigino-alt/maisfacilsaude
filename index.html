@@ -126,6 +126,8 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
 
 <!-- APP -->
 <div id="app-screen" class="hidden">
+  <!-- Erro de conexão Supabase -->
+  <div id="supabase-erro" style="display:none;background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 20px;margin:16px;color:#991b1b;font-size:13px;line-height:1.7"></div>
   <div id="app-header">
     <div class="header-top">
       <div class="header-logo" id="header-logo-area">
@@ -142,6 +144,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
           </div>
         </div>
         <button class="btn-sair no-print" onclick="sair()">Sair →</button>
+        <button id="btn-diagnostico" class="btn-sair no-print" onclick="diagnosticarBanco()" style="background:rgba(217,119,6,.25);border-color:rgba(217,119,6,.4);color:#fcd34d">🔍 Diagnóstico</button>
       </div>
     </div>
     <div class="tabs" id="tabs-clinica">
@@ -191,7 +194,25 @@ const ANO_ATUAL = hoje.getFullYear();
 const fmt = v => (parseFloat(v)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 const fmtDH = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
-const novoNum = () => { GC++; return "GUI"+String(GC).padStart(6,"0"); };
+// novoNum: NÃO gera número — o banco gera via sequence
+// Esta função existe apenas para compatibilidade — não é mais chamada
+// O número vem do retorno do dbInsert (campo 'numero' retornado pelo banco)
+async function novoNum() {
+  // DEPRECATED: número gerado pelo banco. Ver emitirGuia e emitirGuiaAgenda.
+  console.warn("novoNum() chamada — deveria ser gerado pelo banco");
+  const url = `${SUPA_URL}/rest/v1/guias?select=numero&order=numero.desc&limit=1`;
+  try {
+    const r = await fetch(url, { headers: SUPA_HEADERS });
+    if(r.ok) {
+      const d = await r.json();
+      if(Array.isArray(d) && d.length > 0) {
+        const ult = parseInt((d[0].numero||'').replace('GUI',''))||0;
+        return 'GUI' + String(ult+1).padStart(6,'0');
+      }
+    }
+  } catch(e) {}
+  return 'GUI' + String(Date.now()).slice(-6);
+}
 const el = id => document.getElementById(id);
 const chip = (label, cor) => `<span class="chip" style="background:${cor}22;color:${cor}">${label}</span>`;
 const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -212,18 +233,25 @@ const SUPA_HEADERS = {
 
 async function dbGet(tabela, filtros='', ordem='') {
   try {
-    let url = `${SUPA_URL}/rest/v1/${tabela}?select=*`;
-    if (filtros) url += `&${filtros}`;
-    if (ordem) {
-      // Converte formato "coluna.desc" para "coluna=desc" do Supabase REST
-      const ord = ordem.replace('.desc','').replace('.asc','');
-      const dir = ordem.includes('.desc') ? 'desc' : 'asc';
-      url += `&order=${ord}.${dir}`;
+    // Supabase retorna no máximo 1000 por vez — busca em páginas até trazer tudo
+    const PAGE = 1000;
+    let todos = [];
+    let offset = 0;
+    while(true) {
+      let url = `${SUPA_URL}/rest/v1/${tabela}?select=*`;
+      if (filtros) url += `&${filtros}`;
+      if (ordem) url += `&order=${ordem}`;
+      url += `&limit=${PAGE}&offset=${offset}`;
+      const r = await fetch(url, { headers: {...SUPA_HEADERS, 'Prefer': 'count=exact'} });
+      if (!r.ok) { const t=await r.text(); console.error('dbGet error em '+tabela+':', r.status, t); break; }
+      const data = await r.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      todos = todos.concat(data);
+      if (data.length < PAGE) break; // última página
+      offset += PAGE;
     }
-    const r = await fetch(url, { headers: SUPA_HEADERS });
-    if (!r.ok) { const t=await r.text(); console.error('dbGet error em '+tabela+':', r.status, t); return []; }
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
+    console.log(`dbGet ${tabela}: ${todos.length} registros carregados`);
+    return todos;
   } catch(e) { console.error('dbGet exception:', e); return []; }
 }
 
@@ -272,14 +300,34 @@ async function dbDelete(tabela, campo, valor) {
 async function carregarDados() {
   mostrarLoading(true);
   try {
+    console.log('🔄 Carregando dados do Supabase...');
+
+    // Testar conexão primeiro
+    const testR = await fetch(`${SUPA_URL}/rest/v1/clientes?select=count&limit=1`, { headers: SUPA_HEADERS });
+    if (!testR.ok) {
+      const errTxt = await testR.text();
+      console.error('❌ Supabase erro:', testR.status, errTxt);
+      // Mostrar erro amigável na tela
+      const errDiv = document.getElementById('supabase-erro');
+      if(errDiv) {
+        errDiv.style.display = 'block';
+        errDiv.innerHTML = `<strong>⚠️ Erro ao conectar ao banco:</strong> HTTP ${testR.status} — ${errTxt.substring(0,200)}<br><small>Verifique o Supabase RLS e as políticas de acesso.</small>`;
+      }
+      mostrarLoading(false);
+      return;
+    }
+    console.log('✅ Conexão OK. Carregando tabelas...');
+
     const [meds, clis, guis, ags, cxs, mens] = await Promise.all([
       dbGet('medicos','','nome'),
       dbGet('clientes','','nome.asc'),
-      dbGet('guias','','criado_em.desc'),
+      dbGet('guias','','numero.desc'),
       dbGet('agenda','','id.desc'),
-      dbGet('caixa','','criado_em.desc'),
-      dbGet('mensalidades','','criado_em.desc'),
+      dbGet('caixa','','id.desc'),
+      dbGet('mensalidades','','id.desc'),
     ]);
+
+    console.log(`📊 Resultados: médicos=${meds.length}, clientes=${clis.length}, guias=${guis.length}, agenda=${ags.length}, caixa=${cxs.length}, mensalidades=${mens.length}`);
 
     MEDICOS.length = 0;
     if(meds.length > 0) {
@@ -303,7 +351,14 @@ async function carregarDados() {
         vencimento:parseInt(c.vencimento)||10,
         status:c.status||'adimplente', plano:c.plano||'ativo',
         carneAtual:parseInt(c.carne_atual)||1,
-        dependentes:c.dependentes||[],
+        dependentes:(()=>{
+          const d=c.dependentes;
+          if(Array.isArray(d)) return d;
+          if(typeof d==='string' && d && d!=='[]' && d!=='null'){
+            try{return JSON.parse(d);}catch(e){return [];}
+          }
+          return [];
+        })(),
         dataContrato:c.data_contrato||null
       }));
     }
@@ -394,36 +449,95 @@ function mostrarLoading(show) {
 }
 
 // ── WRAPPERS COM SUPABASE ──
-const _salvarCliOriginal = salvarCli;
+// const _salvarCliOriginal = salvarCli; [removido - não necessário]
 async function salvarCli(novoCod, codigoOriginal) {
   const nome=el("f-nome").value.trim(), cpf=el("f-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
-  const dados={
-    codigo:novoCod, nome, cpf, rg:el("f-rg").value||null,
-    nascimento:el("f-nasc").value||null, telefone:el("f-tel").value||null,
-    email:el("f-email").value||null, endereco:el("f-end").value||null,
+
+  // Auto-adicionar dependente se digitado mas não clicado +
+  const nomeDigitado = el("dep-nome") ? el("dep-nome").value.trim() : "";
+  if(nomeDigitado) {
+    if(!window._DEPS_FORM) window._DEPS_FORM = [];
+    window._DEPS_FORM.push({
+      nome: nomeDigitado,
+      cpf: el("dep-cpf") ? el("dep-cpf").value.trim() : "",
+      nascimento: el("dep-nasc") ? el("dep-nasc").value : ""
+    });
+    el("dep-nome").value = "";
+  }
+  const depsArray = Array.isArray(window._DEPS_FORM) ? [...window._DEPS_FORM] : [];
+  const depsStr = JSON.stringify(depsArray);
+  console.log("📦 Dependentes a salvar:", depsArray.length, JSON.stringify(depsArray));
+
+  // Tudo junto num único objeto — titular + dependentes
+  const dados = {
+    codigo:novoCod, nome, cpf,
+    rg:el("f-rg").value||null,
+    nascimento:el("f-nasc").value||null,
+    telefone:el("f-tel").value||null,
+    email:el("f-email").value||null,
+    endereco:el("f-end").value||null,
     mensalidade:parseFloat(el("f-mens").value)||0,
     vencimento:parseInt(el("f-venc").value)||10,
-    status:el("f-status").value, plano:el("f-plano").value,
+    status:el("f-status").value,
+    plano:el("f-plano").value,
     carne_atual:parseInt(el("f-carne").value)||1,
-    dependentes:window._DEPS_FORM||[]
+    dependentes: depsStr
   };
+
+  // Salvar no banco
   let ok;
-  if(codigoOriginal) ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
-  else ok = await dbInsert('clientes',dados);
-  if(!ok) { alert("❌ Erro ao salvar. Verifique a conexão e tente novamente."); return; }
+  if(codigoOriginal) {
+    ok = await dbUpdate('clientes','codigo',codigoOriginal,dados);
+  } else {
+    ok = await dbInsert('clientes',dados);
+  }
+  if(ok === null) {
+    alert("❌ Erro ao salvar. Verifique a conexão.");
+    return;
+  }
+
+  // Se a resposta do banco não incluiu dependentes (coluna pode não existir),
+  // fazer um segundo PATCH só com dependentes usando fetch direto
+  try {
+    const cod = encodeURIComponent(novoCod);
+    const r2 = await fetch(`${SUPA_URL}/rest/v1/clientes?codigo=eq.${cod}`, {
+      method: 'PATCH',
+      headers: SUPA_HEADERS,
+      body: JSON.stringify({ dependentes: depsStr })
+    });
+    if(!r2.ok) {
+      const err = await r2.text();
+      console.warn('PATCH dependentes retornou:', r2.status, err);
+    } else {
+      console.log('✅ dependentes salvos:', depsStr);
+    }
+  } catch(e) {
+    console.warn('Erro no PATCH dependentes:', e);
+  }
+
   // Atualizar memória local
+  const clienteLocal = {
+    ...dados,
+    carneAtual: dados.carne_atual,
+    dependentes: depsArray  // memória usa array
+  };
   if(codigoOriginal) {
     const idx = CLIENTES.findIndex(c=>c.codigo===codigoOriginal);
-    if(idx>=0) CLIENTES[idx] = {...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1};
+    if(idx>=0) CLIENTES[idx] = clienteLocal;
+    else CLIENTES.push(clienteLocal);
   } else {
-    CLIENTES.push({...dados, dependentes:dados.dependentes||[], carneAtual:dados.carne_atual||1});
+    CLIENTES.push(clienteLocal);
   }
+
   renderClientes();
-  alert("✅ Beneficiário salvo com sucesso!");
+  const msgDeps = depsArray.length > 0
+    ? `\n👨‍👩‍👧 ${depsArray.length} dependente(s): ${depsArray.map(d=>d.nome).join(', ')}`
+    : '';
+  alert("✅ Beneficiário salvo!" + msgDeps);
 }
 
-const _salvarContratoOriginal = salvarContrato;
+// const _salvarContratoOriginal = salvarContrato; [removido - não necessário]
 async function salvarContrato(codigo) {
   const nome=el("ct-nome").value.trim(), cpf=el("ct-cpf").value.trim();
   if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
@@ -435,7 +549,7 @@ async function salvarContrato(codigo) {
     mensalidade:parseFloat(el("ct-mens").value)||0,
     vencimento:parseInt(el("ct-venc").value)||10,
     status:'adimplente', plano:'ativo', carne_atual:1,
-    dependentes:window._CT_DEPS||[], data_contrato:new Date().toISOString()
+    dependentes:JSON.stringify(Array.isArray(window._CT_DEPS)?window._CT_DEPS:[]), data_contrato:new Date().toISOString()
   };
   const novo={codigo,nome,cpf,rg:dados.rg,nascimento:dados.nascimento,telefone:dados.telefone,email:dados.email,endereco:dados.endereco,cep:dados.cep,estadoCivil:dados.estado_civil,mensalidade:dados.mensalidade,vencimento:dados.vencimento,status:'adimplente',plano:'ativo',carneAtual:1,dependentes:dados.dependentes,dataContrato:dados.data_contrato};
   await dbInsert('clientes',dados);
@@ -446,22 +560,45 @@ async function salvarContrato(codigo) {
 }
 
 // ── LOGIN ──
-function fazerLogin() {
+async function fazerLogin() {
   const user = el("login-user").value.trim().toLowerCase();
   const pass = el("login-pass").value;
   el("login-error").classList.add("hidden");
 
+  // Clínica admin
   if(user === "clinica" && pass === "admin123") {
-    LOGIN = {tipo:"clinica", nome:"Clínica Mais Fácil Saúde"};
+    LOGIN = {tipo:"clinica", nome:"Clínica Mais Fácil Saúde", operador:"Administrador"};
     iniciarApp();
     return;
   }
-  const med = MEDICOS.find(m => m.id.toLowerCase() === user && m.senha === pass);
+
+  // Funcionárias
+  const FUNCIONARIAS = [
+    {usuario:"priscilla", senha:"1234", nome:"Priscilla Zani"},
+    {usuario:"alessandra", senha:"1234", nome:"Alessandra Chad"},
+  ];
+  const func = FUNCIONARIAS.find(f => f.usuario === user && f.senha === pass);
+  if(func) {
+    LOGIN = {tipo:"clinica", nome:func.nome, operador:func.nome};
+    iniciarApp();
+    return;
+  }
+
+  // Médico — buscar do banco se MEDICOS ainda não carregou
+  let listaMed = MEDICOS && MEDICOS.length > 0 ? MEDICOS : [];
+  if(listaMed.length === 0) {
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/medicos?select=*`, {headers: SUPA_HEADERS});
+      if(r.ok) listaMed = await r.json();
+    } catch(e) { console.warn("Erro ao buscar médicos no login:", e); }
+  }
+  const med = listaMed.find(m => (m.id||"").toLowerCase() === user && m.senha === pass);
   if(med) {
     LOGIN = {tipo:"medico", medico:med};
     iniciarApp();
     return;
   }
+
   el("login-error").textContent = "❌ Usuário ou senha incorretos. Tente novamente.";
   el("login-error").classList.remove("hidden");
 }
@@ -473,9 +610,12 @@ async function iniciarApp() {
   el("login-screen").classList.add("hidden");
   el("app-screen").classList.remove("hidden");
   await carregarDados();
-  el("user-name").textContent = LOGIN.tipo==="clinica" ? "Clínica" : LOGIN.medico.nome;
-  el("user-role").textContent = LOGIN.tipo==="clinica" ? "Administrador" : LOGIN.medico.especialidade;
-  el("user-icon").textContent = LOGIN.tipo==="clinica" ? "🏥" : "👨‍⚕️";
+  el("user-name").textContent = LOGIN.tipo==="clinica" ? (LOGIN.nome||"Clínica") : LOGIN.medico.nome;
+  el("user-role").textContent = LOGIN.tipo==="clinica" ? (LOGIN.operador==="Administrador"?"Administrador":"Funcionária") : LOGIN.medico.especialidade;
+  // Esconder diagnóstico para médicos e funcionárias (só admin vê)
+  const btnDiag = el("btn-diagnostico");
+  if(btnDiag) btnDiag.style.display = (LOGIN.tipo==="clinica" && LOGIN.operador==="Administrador") ? "" : "none";
+  el("user-icon").textContent = LOGIN.tipo==="clinica" ? (LOGIN.operador==="Administrador"?"🏥":"👩‍💼") : "👨‍⚕️";
 
   if(LOGIN.tipo === "medico") {
     el("tabs-clinica").classList.add("hidden");
@@ -486,6 +626,39 @@ async function iniciarApp() {
   } else {
     renderDashboard();
   }
+}
+
+async function diagnosticarBanco() {
+  const tabelas = ['clientes','medicos','guias','agenda','caixa','mensalidades'];
+  let resultados = '🔍 DIAGNÓSTICO DO BANCO DE DADOS\n';
+  resultados += '═══════════════════════════════\n';
+  resultados += `URL: ${SUPA_URL}\n\n`;
+  for(const t of tabelas) {
+    try {
+      const url = `${SUPA_URL}/rest/v1/${t}?select=*&limit=1`;
+      const r = await fetch(url, { headers: SUPA_HEADERS });
+      const txt = await r.text();
+      if(r.ok) {
+        let data = [];
+        try { data = JSON.parse(txt); } catch(e) {}
+        // Contar total
+        const urlCount = `${SUPA_URL}/rest/v1/${t}?select=count`;
+        const rCount = await fetch(urlCount, { headers: {...SUPA_HEADERS, 'Prefer': 'count=exact'} });
+        const total = rCount.headers.get('content-range') || '?';
+        resultados += `✅ ${t}: OK (content-range: ${total})\n`;
+      } else {
+        resultados += `❌ ${t}: HTTP ${r.status} — ${txt.substring(0,100)}\n`;
+      }
+    } catch(e) {
+      resultados += `💥 ${t}: ERRO — ${e.message}\n`;
+    }
+  }
+  resultados += '\n📋 Dados em memória:\n';
+  resultados += `   Clientes: ${CLIENTES.length}\n`;
+  resultados += `   Médicos: ${MEDICOS.length}\n`;
+  resultados += `   Guias: ${GUIAS.length}\n`;
+  alert(resultados);
+  console.log(resultados);
 }
 
 function sair() {
@@ -630,7 +803,7 @@ function renderClientes(busca="",filtro="todos") {
             <div style="width:46px;height:46px;border-radius:12px;background:${c.status==="adimplente"?"#dcfce7":"#fee2e2"};display:flex;align-items:center;justify-content:center;font-size:22px">${c.status==="adimplente"?"✅":"⚠️"}</div>
             <div>
               <div style="font-weight:800;font-size:15px">${c.nome}</div>
-              <div style="font-size:12px;color:#64748b"><span style="font-family:monospace;font-weight:700;color:#0e7490">${c.codigo}</span> • ${c.cpf} • ${c.dependentes.length} dep. • vence dia ${c.vencimento}</div>
+              <div style="font-size:12px;color:#64748b"><span style="font-family:monospace;font-weight:700;color:#0e7490">${c.codigo}</span> • ${c.cpf} • ${parseDeps(c.dependentes).length} dep. • vence dia ${c.vencimento}</div>
               ${c.carneAtual>=11?'<div style="font-size:11px;font-weight:800;color:#d97706">⚠️ Emitir novo carnê</div>':""}
             </div>
           </div>
@@ -646,10 +819,16 @@ function renderClientes(busca="",filtro="todos") {
     </div>`;
 }
 
+function parseDeps(d) {
+  if(Array.isArray(d)) return d;
+  if(typeof d==='string' && d && d!=='null') { try{return JSON.parse(d);}catch(e){return[];} }
+  return [];
+}
+
 function verCli(codigo) {
   const c = CLIENTES.find(x=>x.codigo===codigo);
   if(!c){alert("Cliente não encontrado.");renderClientes();return;}
-  if(!c.dependentes) c.dependentes = [];
+  c.dependentes = parseDeps(c.dependentes);
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
     <div style="background:linear-gradient(135deg,#0c4a6e,#0e7490);border-radius:16px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
@@ -711,7 +890,19 @@ async function abrirFormCli(codigo) {
       novoCod = "MFS"+String(maxCod+1).padStart(5,"0");
     }
   }
-  const f = c ? {...c,dependentes:[...c.dependentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
+  // Converter dependentes de string JSON ou array para array
+  const depsExistentes = (() => {
+    if(!c) return [];
+    const d = c.dependentes;
+    if(Array.isArray(d)) return d;
+    if(typeof d === 'string' && d) { try { return JSON.parse(d); } catch(e) { return []; } }
+    return [];
+  })();
+  const f = c ? {...c, dependentes:[...depsExistentes]} : {codigo:novoCod,nome:"",cpf:"",rg:"",nascimento:"",endereco:"",telefone:"",email:"",mensalidade:189.90,vencimento:10,status:"adimplente",plano:"ativo",dependentes:[],carneAtual:1};
+
+  // Inicializar _DEPS_FORM ANTES de renderizar o HTML
+  window._DEPS_FORM = [...depsExistentes];
+  console.log("🔄 abrirFormCli: depsExistentes =", JSON.stringify(depsExistentes));
 
   el("aba-clientes").innerHTML = `
     <button class="back-btn" onclick="renderClientes()">← Voltar</button>
@@ -760,7 +951,7 @@ async function abrirFormCli(codigo) {
       <button class="btn btn-outline" onclick="renderClientes()">Cancelar</button>
     </div>`;
 
-  window._DEPS_FORM = [...f.dependentes];
+  // _DEPS_FORM já inicializado acima, antes do innerHTML
   window._DEPS_FORM_RENDER = () => {
     el("lista-deps").innerHTML = window._DEPS_FORM.map((d,i)=>`<div style="display:flex;gap:8px;align-items:center;background:#f8fafc;border-radius:10px;padding:8px 12px;margin-bottom:8px">
       <div style="flex:1"><div style="font-weight:700">${d.nome}</div><div style="font-size:11px;color:#94a3b8">CPF: ${d.cpf}</div></div>
@@ -773,9 +964,17 @@ window.removerDep = i => { window._DEPS_FORM.splice(i,1); window._DEPS_FORM_REND
 window.addDep = () => {
   const nome=el("dep-nome").value.trim();
   if(!nome){alert("Informe o nome do dependente.");return;}
-  window._DEPS_FORM.push({nome,cpf:el("dep-cpf").value,nascimento:el("dep-nasc").value});
-  el("dep-nome").value="";el("dep-cpf").value="";el("dep-nasc").value="";
+  if(!window._DEPS_FORM) window._DEPS_FORM = [];
+  window._DEPS_FORM.push({
+    nome,
+    cpf: el("dep-cpf").value.trim(),
+    nascimento: el("dep-nasc").value
+  });
+  el("dep-nome").value="";
+  el("dep-cpf").value="";
+  el("dep-nasc").value="";
   window._DEPS_FORM_RENDER();
+  console.log("➕ Dependente adicionado. Total:", window._DEPS_FORM.length, window._DEPS_FORM);
 };
 
 // salvarCli definida acima com Supabase
@@ -855,27 +1054,13 @@ window.addDepContrato = () => {
   window._CT_RENDER_DEPS();
 };
 
-function salvarContrato(codigo) {
-  const nome=el("ct-nome").value.trim(), cpf=el("ct-cpf").value.trim();
-  if(!nome||!cpf){alert("Nome e CPF obrigatórios.");return;}
-  const novo={
-    codigo, nome, cpf, rg:el("ct-rg").value, nascimento:el("ct-nasc").value,
-    telefone:el("ct-tel").value, email:el("ct-email").value, endereco:el("ct-end").value,
-    cep:el("ct-cep").value, estadoCivil:el("ct-ecivil").value,
-    mensalidade:parseFloat(el("ct-mens").value)||0, vencimento:parseInt(el("ct-venc").value)||10,
-    status:"adimplente", plano:"ativo", carneAtual:1,
-    dependentes:[...(window._CT_DEPS||[])], dataContrato:new Date().toISOString(),
-  };
-  CLIENTES.push(novo);
-  imprimirContrato(codigo, novo);
-  renderClientes();
-  alert("✅ Cliente "+codigo+" cadastrado!\n\n⚠️ LEMBRE-SE: Emitir o carnê de pagamento para este cliente.");
-}
+// salvarContrato definitivo com banco — definido acima na linha ~464
+// esta versão local foi removida para evitar conflito
 
 function imprimirContrato(codigo, dadosPassados) {
   const c = dadosPassados || CLIENTES.find(x=>x.codigo===codigo);
   if(!c){alert("Cliente não encontrado.");return;}
-  if(!c.dependentes) c.dependentes = [];
+  c.dependentes = parseDeps(c.dependentes);
   const dataHoje = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
   const logoHtml = LOGO_URL ? `<img src="${LOGO_URL}" style="height:70px;object-fit:contain;">` : `<div style="font-family:Arial,sans-serif;font-weight:900;font-size:22px;color:#000">MAIS FÁCIL SAÚDE</div>`;
 
@@ -1065,9 +1250,12 @@ function renderGuias() {
 }
 
 function guiaRow(g) {
-  return `<div class="guia-row" style="border:1.5px solid ${g.status==="Baixada"?"#86efac":"#e2e8f0"}">
+  const _bc = g.status==="Baixada"?"#86efac":g.status==="Cancelada"?"#fca5a5":"#e2e8f0";
+  const _bg = g.status==="Baixada"?"#dcfce7":g.status==="Cancelada"?"#fee2e2":"#dbeafe";
+  const _ic = g.status==="Baixada"?"✅":g.status==="Cancelada"?"🚫":"📋";
+  return `<div class="guia-row" style="border:1.5px solid ${_bc}">
     <div style="display:flex;gap:14px;align-items:center">
-      <div style="background:${g.status==="Baixada"?"#dcfce7":"#dbeafe"};border-radius:10px;padding:8px 10px;font-size:18px">${g.status==="Baixada"?"✅":"📋"}</div>
+      <div style="background:${_bg};border-radius:10px;padding:8px 10px;font-size:18px">${_ic}</div>
       <div>
         <div style="font-weight:900;color:#0c4a6e;font-size:14px;font-family:monospace">${g.numero}</div>
         <div style="font-size:13px;font-weight:600">${g.nomePaciente}</div>
@@ -1075,11 +1263,10 @@ function guiaRow(g) {
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${chip(g.status,g.status==="Baixada"?"#16a34a":"#0e7490")}
-      ${g.status==="Baixada"?chip("BLOQUEADA","#dc2626"):""}
+      ${chip(g.status,g.status==="Baixada"?"#16a34a":g.status==="Cancelada"?"#dc2626":"#0e7490")}
       <span style="font-weight:800;color:#0e7490">${fmt(g.valorConsulta)}</span>
       <button style="padding:7px 12px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:8px;color:#0e7490;font-weight:700;font-size:12px;cursor:pointer" onclick="reimprGuia('${g.numero}')">🖨️ Guia</button>
-      <button style="padding:7px 12px;background:#fff7ed;border:1.5px solid #f59e0b;border-radius:8px;color:#b45309;font-weight:700;font-size:12px;cursor:pointer" onclick="alterarStatusGuia('${g.numero}')">✏️ Status</button>
+      ${g.status!=="Baixada"&&g.status!=="Cancelada"?`<button style="padding:7px 12px;background:#fee2e2;border:1.5px solid #dc2626;border-radius:8px;color:#dc2626;font-weight:700;font-size:12px;cursor:pointer" onclick="alterarStatusGuia('${g.numero}')">❌ Cancelar</button>`:g.status==="Cancelada"?`<span style="font-size:11px;font-weight:800;color:#dc2626">🚫 Cancelada</span>`:`<span style="font-size:11px;font-weight:800;color:#16a34a">🔒 Baixada</span>`}
       <button style="padding:7px 12px;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:8px;color:#16a34a;font-weight:700;font-size:12px;cursor:pointer" onclick="reimprRecibo('${g.numero}')">🧾 Recibo</button>
     </div>
   </div>`;
@@ -1158,7 +1345,7 @@ function buscarCliGuia() {
   if(!c){msg.innerHTML='<div class="alert alert-red"><span>❌</span><span style="color:#991b1b;font-weight:700">Não encontrado. Tente MFS00001 ou MFS00003.</span></div>';GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";el("ng-hint").style.display="block";return;}
   if(c.plano==="cancelado"){msg.innerHTML='<div class="alert alert-red"><span>❌</span><span style="color:#991b1b;font-weight:700">Plano cancelado.</span></div>';GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";return;}
   if(c.status==="inadimplente"){msg.innerHTML=`<div class="alert alert-yellow"><span>⚠️</span><span style="color:#92400e;font-weight:700">${c.nome} está INADIMPLENTE. Regularize antes de emitir.</span></div>`;GUIA_CLI_OK=null;el("ng-cli-info").style.display="none";el("ng-form-card").style.display="none";return;}
-  GUIA_CLI_OK = c;
+  c.dependentes = parseDeps(c.dependentes); GUIA_CLI_OK = c;
   msg.innerHTML='<div class="alert alert-green"><span>✅</span><span style="color:#166534;font-weight:700">'+c.nome+' — adimplente.</span></div>';
   el("ng-hint").style.display="none";
   el("ng-cli-info").style.display="block";
@@ -1175,43 +1362,23 @@ function mostrarEndMedico() {
   else el("ng-end-med").style.display="none";
 }
 
-function emitirGuia() {
-  if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
-  const medId=el("ng-medico").value;
-  if(!medId){alert("Selecione o médico.");return;}
-  const dataHora=el("ng-data").value;
-  if(!dataHora){alert("Informe data e hora.");return;}
+// emitirGuia sem banco removida — usar apenas a versão com banco abaixo
 
-  const tipoAt=el("ng-paciente").value;
-  const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
-  const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
-  const mesAt=new Date(dataHora).getMonth()+1;
-  const anoAt=new Date(dataHora).getFullYear();
-
-  const nova={
-    numero, codigoCliente:GUIA_CLI_OK.codigo,
-    nomePaciente:paciente?paciente.nome:GUIA_CLI_OK.nome,
-    cpfPaciente:paciente?paciente.cpf:GUIA_CLI_OK.cpf,
-    tipoAtendimento:tipoAt, medicoId:medId, medicoNome:med?med.nome:"",
-    especialidade:med?med.especialidade:"", enderecoAtendimento:med?med.endereco:"",
-    dataHora, tipoServico:el("ng-tipo").value,
-    valorConsulta:parseFloat(el("ng-vc").value)||0,
-    valorRepasse:parseFloat(el("ng-vr").value)||0,
-    valorPago:parseFloat(el("ng-vp").value)||0,
-    formaPagamento:el("ng-fp").value,
-    emitidaEm:new Date().toISOString(), status:"Emitida",
-    mesAtendimento:mesAt, anoAtendimento:anoAt,
-    mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
-  };
-
-  GUIAS.unshift(nova);
-  GUIA_TELA="lista";
-  renderGuias();
-  setTimeout(()=>{
-    imprimirGuiaPDF(nova, med, paciente);
-    setTimeout(()=>imprimirReciboPDF(nova, med, paciente),800);
-  },300);
+function reimprGuiaAgenda(agId) {
+  // Busca a guia mais recente do paciente desta agenda
+  const a = AGENDA.find(x=>x.id===agId);
+  if(!a){alert("Agendamento não encontrado.");return;}
+  // Buscar no array GUIAS pela guia mais recente deste paciente
+  const guia = GUIAS.find(g=>g.nomePaciente===a.nomePaciente && g.status==="Emitida")
+             || GUIAS.find(g=>g.nomePaciente===a.nomePaciente);
+  if(!guia){
+    alert("Guia não encontrada. Tente emitir novamente.");
+    return;
+  }
+  const med = MEDICOS.find(m=>m.id===guia.medicoId)
+           || {nome:guia.medicoNome||a.medicoNome||"", especialidade:guia.especialidade||"", endereco:guia.enderecoAtendimento||""};
+  const pac = {nome:guia.nomePaciente, cpf:guia.cpfPaciente};
+  imprimirGuiaPDF(guia, med, pac);
 }
 
 function reimprGuia(numero) {
@@ -1247,7 +1414,6 @@ function imprimirGuiaPDF(guia, med, pac) {
       <div><div class="li"><span class="lik">Data e Hora:</span><span class="liv">${fmtDH(guia.dataHora)}</span></div><div class="li"><span class="lik">Tipo:</span><span class="liv">${guia.tipoServico}</span></div></div>
       <div><div class="li"><span class="lik">Nº da Guia:</span><span class="liv" style="font-family:monospace;font-weight:900;color:#0c4a6e">${guia.numero}</span></div><div class="li"><span class="lik">Status:</span><span class="liv" style="color:${baixada?"#dc2626":"#0e7490"};font-weight:800">${guia.status}</span></div></div>
     </div>
-    ${guia.observacao?`<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:12px 16px;margin-bottom:16px"><div style="font-size:10px;font-weight:900;color:#92400e;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">OBSERVAÇÕES</div><div style="font-size:13px;color:#1e293b">${guia.observacao}</div></div>`:""}
     <div class="rodape"><div style="font-size:11px;color:#94a3b8;line-height:1.8"><div>Guia emitida e paga — válida para atendimento</div><div>Mais Fácil Saúde • CNPJ: 00.000.000/0001-00</div><div style="color:#dc2626;font-weight:700">Guia de uso único</div></div><div style="text-align:center"><div style="width:160px;border-bottom:1.5px solid #334155;padding-bottom:4px"></div><div style="font-size:11px;color:#64748b;margin-top:6px">${med?med.nome:""}</div></div></div>
   </div></body></html>`;
   const w=window.open("","_blank");w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
@@ -2228,7 +2394,10 @@ function renderAgenda() {
                   <td style="text-align:center">
                     <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
                       <button onclick="editarAgenda(${a.id})" style="padding:5px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;font-weight:700;cursor:pointer">✏️</button>
-                      <button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>
+                      ${a.status==="Guia Emitida"
+                        ? `<button onclick="reimprGuiaAgenda(${a.id})" style="padding:5px 10px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;font-weight:700;cursor:pointer">🖨️ Guia</button>`
+                        : `<button onclick="emitirGuiaAgenda(${a.id})" style="padding:5px 10px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:6px;color:#16a34a;font-size:11px;font-weight:700;cursor:pointer">📋 Guia</button>`
+                      }
                       <button onclick="excluirAgenda(${a.id})" style="padding:5px 10px;background:#fee2e2;border:none;border-radius:6px;color:#dc2626;font-size:11px;cursor:pointer">✕</button>
                     </div>
                   </td>
@@ -2494,39 +2663,63 @@ function excluirAgenda(id) {
   renderAgenda();
 }
 
-function emitirGuiaAgenda(id) {
+async function emitirGuiaAgenda(id) {
   const a=AGENDA.find(x=>x.id===id);
   if(!a){alert("Agendamento não encontrado.");return;}
   // Verifica se é beneficiário MFS e se está inadimplente
   const c=a.codigoMFS?CLIENTES.find(x=>x.codigo===a.codigoMFS):null;
   if(c&&c.status==="inadimplente"){alert("⚠️ Cliente INADIMPLENTE. Regularize antes de emitir a guia.");return;}
-  const med=MEDICOS.find(m=>m.id===a.medicoId);
-  const numero=novoNum();
+  // med pode ser null para médicos externos (outros convênios)
+  const med=MEDICOS.find(m=>m.id===a.medicoId)||null;
+  const medNome = med?.nome || a.medicoNome || a.medicoExterno || "Médico Externo";
+  const medEndereco = med?.endereco || a.enderecoMedico || "";
+  const medEsp = med?.especialidade || "";
+  const numero=await novoNum();
   const mesAt=new Date(a.dataHora).getMonth()+1;
   const anoAt=new Date(a.dataHora).getFullYear();
   const nova={
     numero, codigoCliente:c?c.codigo:"PART", nomePaciente:a.nomePaciente, cpfPaciente:a.cpf||(c?c.cpf:""),
-    tipoAtendimento:"titular", medicoId:a.medicoId, medicoNome:a.medicoNome,
-    especialidade:med?med.especialidade:"", enderecoAtendimento:a.enderecoMedico||med?.endereco||"",
+    tipoAtendimento:"titular", medicoId:a.medicoId||"", medicoNome:medNome,
+    especialidade:medEsp, enderecoAtendimento:medEndereco,
     dataHora:a.dataHora, tipoServico:a.tipoServico,
     valorConsulta:a.valorConsulta, valorRepasse:a.valorRepasse, valorPago:a.valorConsulta,
     formaPagamento:"", emitidaEm:new Date().toISOString(), status:"Emitida",
     mesAtendimento:mesAt, anoAtendimento:anoAt,
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
+  // Salvar no banco — NÃO manda 'numero', o banco gera
+  const resAgenda = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
+    nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
+    tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
+    medico_nome:nova.medicoNome, especialidade:nova.especialidade,
+    endereco_atendimento:nova.enderecoAtendimento, data_hora:nova.dataHora,
+    tipo_servico:nova.tipoServico, valor_consulta:nova.valorConsulta,
+    valor_repasse:nova.valorRepasse, valor_pago:nova.valorPago,
+    forma_pagamento:"", emitida_em:nova.emitidaEm,
+    status:nova.status, mes_atendimento:nova.mesAtendimento,
+    ano_atendimento:nova.anoAtendimento, mes_repasse:nova.mesRepasse,
+    ano_repasse:nova.anoRepasse
+  });
+  if(!resAgenda) { alert("❌ Erro ao salvar guia no banco."); return; }
+  const numFinalAgenda = Array.isArray(resAgenda) ? resAgenda[0]?.numero : resAgenda?.numero;
+  if(numFinalAgenda) nova.numero = numFinalAgenda;
+  console.log("✅ Guia agenda salva com número:", nova.numero);
+
   GUIAS.unshift(nova);
-  // Atualiza status agenda
   const idx=AGENDA.findIndex(x=>x.id===id);
   if(idx>=0) AGENDA[idx].status="Guia Emitida";
+  await dbUpdate('agenda','id',id,{status:'Guia Emitida'});
   renderAgenda();
-  // Imprime guia e recibo
-  const pac={nome:a.nomePaciente,cpf:a.cpf||c.cpf};
-  setTimeout(()=>{ imprimirGuiaPDF(nova,med,pac); setTimeout(()=>imprimirReciboPDF(nova,med,pac),800); },300);
-  alert("✅ Guia "+numero+" emitida com sucesso!");
+  const pac={nome:a.nomePaciente,cpf:a.cpf||(c?c.cpf:"")};
+  // Criar objeto med simulado para convenios externos
+  const medParaImprimir = med || {nome:medNome, especialidade:medEsp, endereco:medEndereco};
+  setTimeout(()=>{ imprimirGuiaPDF(nova,medParaImprimir,pac); setTimeout(()=>imprimirReciboPDF(nova,medParaImprimir,pac),800); },300);
+  alert("✅ Guia "+nova.numero+" emitida com sucesso!");
 }
 
 // ── SAVE GUIA NO BANCO ──
-const _emitirGuiaOriginal = emitirGuia;
+// const _emitirGuiaOriginal = emitirGuia; [removido - não necessário]
 async function emitirGuia() {
   if(!GUIA_CLI_OK){alert("Busque um beneficiário.");return;}
   const medId=el("ng-medico").value;
@@ -2537,7 +2730,7 @@ async function emitirGuia() {
   const tipoAt=el("ng-paciente").value;
   const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
   const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(dataHora).getMonth()+1;
   const anoAt=new Date(dataHora).getFullYear();
 
@@ -2557,9 +2750,9 @@ async function emitirGuia() {
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
 
-  // Salvar no banco
-  await dbInsert('guias', {
-    numero:nova.numero, codigo_cliente:nova.codigoCliente,
+  // Salvar no banco — NÃO manda 'numero', o banco gera via sequence
+  const resultado = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
     nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
     tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
     medico_nome:nova.medicoNome, especialidade:nova.especialidade,
@@ -2571,6 +2764,13 @@ async function emitirGuia() {
     ano_atendimento:nova.anoAtendimento, mes_repasse:nova.mesRepasse,
     ano_repasse:nova.anoRepasse
   });
+
+  if(!resultado) { alert("❌ Erro ao salvar guia no banco."); return; }
+
+  // Número definitivo vem do banco
+  const numeroFinal = Array.isArray(resultado) ? resultado[0]?.numero : resultado?.numero;
+  if(numeroFinal) nova.numero = numeroFinal;
+  console.log("✅ Guia salva no banco com número:", nova.numero);
 
   GUIAS.unshift(nova);
   GUIA_TELA="lista";
@@ -2743,7 +2943,7 @@ function alterarStatusGuia(numero) {
   const g = GUIAS.find(x=>x.numero===numero);
   if(!g){alert("Guia não encontrada.");return;}
   if(g.status==="Baixada") {
-    alert("❌ Esta guia já foi baixada e não pode ser alterada.\n\nGuias baixadas são imutáveis.");
+    alert("🚫 GUIA IMUTÁVEL\n\nEsta guia foi baixada pelo médico " + (g.medicoNome||"") + " em " + fmtDH(g.baixadaEm) + ".\n\nGuias baixadas pelo médico não podem ser alteradas ou canceladas.");
     return;
   }
   if(g.status==="Cancelada") {
@@ -2867,7 +3067,7 @@ window._emitirGuiaV2 = async function() {
   const tipoAt=el("ng-paciente").value;
   const paciente = tipoAt==="titular" ? {nome:GUIA_CLI_OK.nome,cpf:GUIA_CLI_OK.cpf} : GUIA_CLI_OK.dependentes.find((_,i)=>"dep_"+i===tipoAt);
   const med=MEDICOS.find(m=>m.id===medId);
-  const numero=novoNum();
+  const numero=await novoNum();
   const mesAt=new Date(dataHora).getMonth()+1;
   const anoAt=new Date(dataHora).getFullYear();
 
@@ -2887,8 +3087,9 @@ window._emitirGuiaV2 = async function() {
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
 
-  await dbInsert('guias', {
-    numero:nova.numero, codigo_cliente:nova.codigoCliente,
+  // Salvar no banco — NÃO manda 'numero', banco gera via sequence
+  const resV2 = await dbInsert('guias', {
+    codigo_cliente:nova.codigoCliente,
     nome_paciente:nova.nomePaciente, cpf_paciente:nova.cpfPaciente,
     tipo_atendimento:nova.tipoAtendimento, medico_id:nova.medicoId,
     medico_nome:nova.medicoNome, especialidade:nova.especialidade,
@@ -2897,9 +3098,14 @@ window._emitirGuiaV2 = async function() {
     valor_repasse:nova.valorRepasse, valor_pago:nova.valorPago,
     forma_pagamento:nova.formaPagamento, info_complementar:infoComp,
     emitida_em:nova.emitidaEm, status:nova.status,
+    operador: LOGIN?.operador || LOGIN?.nome || "Clínica",
     mes_atendimento:nova.mesAtendimento, ano_atendimento:nova.anoAtendimento,
     mes_repasse:nova.mesRepasse, ano_repasse:nova.anoRepasse
   });
+  if(!resV2) { alert("❌ Erro ao salvar guia no banco."); return; }
+  const numV2 = Array.isArray(resV2) ? resV2[0]?.numero : resV2?.numero;
+  if(numV2) nova.numero = numV2;
+  console.log("✅ Guia V2 salva com número:", nova.numero);
 
   GUIAS.unshift(nova);
   GUIA_TELA="lista";

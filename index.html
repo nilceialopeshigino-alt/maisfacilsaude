@@ -2683,7 +2683,8 @@ async function emitirGuiaAgenda(id) {
     especialidade:medEsp, enderecoAtendimento:medEndereco,
     dataHora:a.dataHora, tipoServico:a.tipoServico,
     valorConsulta:a.valorConsulta, valorRepasse:a.valorRepasse, valorPago:a.valorConsulta,
-    formaPagamento:"", emitidaEm:new Date().toISOString(), status:"Emitida",
+    formaPagamento:"", infoComplementar:a.observacao||"",
+    emitidaEm:new Date().toISOString(), status:"Emitida",
     mesAtendimento:mesAt, anoAtendimento:anoAt,
     mesRepasse:mesAt===12?1:mesAt+1, anoRepasse:mesAt===12?anoAt+1:anoAt,
   };
@@ -2696,7 +2697,7 @@ async function emitirGuiaAgenda(id) {
     endereco_atendimento:nova.enderecoAtendimento, data_hora:nova.dataHora,
     tipo_servico:nova.tipoServico, valor_consulta:nova.valorConsulta,
     valor_repasse:nova.valorRepasse, valor_pago:nova.valorPago,
-    forma_pagamento:"", emitida_em:nova.emitidaEm,
+    forma_pagamento:"", info_complementar:nova.infoComplementar||null, emitida_em:nova.emitidaEm,
     status:nova.status, mes_atendimento:nova.mesAtendimento,
     ano_atendimento:nova.anoAtendimento, mes_repasse:nova.mesRepasse,
     ano_repasse:nova.anoRepasse

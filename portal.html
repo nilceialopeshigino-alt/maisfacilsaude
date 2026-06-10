@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mais Fácil Saúde — Portal do Beneficiário</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f9ff;min-height:100vh;color:#1e293b}
+input,select,button,textarea{font-family:inherit}
+.hidden{display:none!important}
+
+/* ── LOGIN ── */
+#login-screen{min-height:100vh;background:linear-gradient(160deg,#0c4a6e 0%,#0369a1 50%,#0e7490 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
+#login-screen::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+.login-card{background:#fff;border-radius:24px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.35);position:relative;z-index:1}
+.login-top{background:linear-gradient(135deg,#0c4a6e,#0e7490);padding:32px 28px 24px;text-align:center}
+.login-logo{font-size:42px;margin-bottom:8px}
+.login-brand{color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.login-sub{color:#7dd3fc;font-size:13px;font-weight:600;margin-top:4px;letter-spacing:1px}
+.login-body{padding:28px}
+.login-label{display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.login-input{width:100%;padding:13px 16px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:15px;color:#1e293b;outline:none;transition:border-color .2s,box-shadow .2s;background:#f8fafc;margin-bottom:16px}
+.login-input:focus{border-color:#0e7490;box-shadow:0 0 0 3px rgba(14,116,144,.12);background:#fff}
+.login-btn{width:100%;padding:15px;background:linear-gradient(135deg,#0c4a6e,#0e7490);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:16px;cursor:pointer;letter-spacing:.3px;transition:opacity .2s}
+.login-btn:active{opacity:.85}
+.login-err{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#991b1b;text-align:center}
+.login-help{margin-top:18px;text-align:center;font-size:12px;color:#94a3b8;line-height:1.8}
+.login-help a{color:#0e7490;font-weight:700;text-decoration:none}
+
+/* ── APP SHELL ── */
+#app-screen{min-height:100vh;background:#f0f9ff;padding-bottom:80px}
+
+/* ── HEADER ── */
+.app-header{background:linear-gradient(135deg,#0c4a6e,#0e7490);padding:16px 20px 20px;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(12,74,110,.3)}
+.header-row{display:flex;align-items:center;justify-content:space-between}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-logo-icon{font-size:24px}
+.header-name{color:#fff;font-weight:800;font-size:16px;line-height:1.2}
+.header-sub{color:#7dd3fc;font-size:11px;font-weight:600}
+.header-avatar{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:2px solid rgba(255,255,255,.3)}
+
+/* ── CARTEIRINHA MINI ── */
+.header-card-mini{margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.mini-nome{color:#fff;font-weight:700;font-size:14px}
+.mini-cod{color:#7dd3fc;font-size:11px;font-family:monospace;font-weight:700}
+.mini-status{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800}
+.status-adim{background:#dcfce7;color:#16a34a}
+.status-inadim{background:#fee2e2;color:#dc2626}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e2e8f0;display:flex;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,.08)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 12px;cursor:pointer;gap:4px;transition:color .2s}
+.nav-icon{font-size:22px;line-height:1}
+.nav-label{font-size:10px;font-weight:700;color:#94a3b8}
+.nav-item.active .nav-label{color:#0e7490}
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 6px rgba(14,116,144,.5))}
+
+/* ── PAGES ── */
+.page{padding:20px}
+.page-title{font-size:20px;font-weight:900;color:#0f172a;margin-bottom:4px}
+.page-sub{font-size:13px;color:#94a3b8;margin-bottom:20px}
+
+/* ── CARDS ── */
+.card{background:#fff;border-radius:18px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.card-header{padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px}
+.card-header-icon{font-size:18px}
+.card-header-title{font-weight:800;font-size:14px;color:#0f172a}
+.card-body{padding:18px}
+
+/* ── CARTEIRINHA DIGITAL ── */
+.carteirinha{background:linear-gradient(135deg,#0c4a6e 0%,#0369a1 50%,#0e7490 100%);border-radius:20px;padding:24px;color:#fff;position:relative;overflow:hidden;margin-bottom:20px;box-shadow:0 12px 40px rgba(12,74,110,.4)}
+.cart-bg{position:absolute;right:-20px;top:-20px;font-size:120px;opacity:.06}
+.cart-logo{font-size:13px;font-weight:700;color:#7dd3fc;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.cart-nome{font-size:20px;font-weight:900;margin-bottom:4px}
+.cart-cod{font-family:monospace;font-size:14px;color:#7dd3fc;margin-bottom:16px;letter-spacing:2px}
+.cart-row{display:flex;justify-content:space-between;align-items:flex-end}
+.cart-label{font-size:10px;color:rgba(255,255,255,.6);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.cart-val{font-size:14px;font-weight:700}
+.cart-chip{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800}
+.chip-adim{background:#dcfce7;color:#16a34a}
+.chip-inadim{background:#fee2e2;color:#dc2626}
+
+/* ── PARCELAS ── */
+.parcelas-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:12px}
+.parcela-cell{aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:1.5px solid #e2e8f0}
+.p-pago{background:#dcfce7;color:#16a34a;border-color:#86efac}
+.p-atual{background:#0e7490;color:#fff;border-color:#0e7490}
+.p-futuro{background:#f8fafc;color:#cbd5e1;border-color:#e2e8f0}
+
+/* ── GUIAS ── */
+.guia-item{border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;margin-bottom:10px;background:#fff}
+.guia-numero{font-family:monospace;font-weight:900;font-size:14px;color:#0c4a6e}
+.guia-info{font-size:12px;color:#94a3b8;margin-top:2px}
+.guia-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800}
+.badge-emitida{background:#dbeafe;color:#1d4ed8}
+.badge-baixada{background:#dcfce7;color:#16a34a}
+.badge-cancelada{background:#fee2e2;color:#dc2626}
+
+/* ── AGENDA ── */
+.ag-item{border-left:4px solid #0e7490;background:#fff;border-radius:0 14px 14px 0;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.ag-data{font-size:11px;font-weight:800;color:#0e7490;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.ag-titulo{font-weight:700;font-size:15px;color:#0f172a}
+.ag-sub{font-size:12px;color:#94a3b8;margin-top:2px}
+
+/* ── FORM AGENDAMENTO ── */
+.form-label{display:block;font-size:11px;font-weight:800;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.form-control{width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;color:#1e293b;outline:none;background:#f8fafc;transition:border-color .2s}
+.form-control:focus{border-color:#0e7490;background:#fff}
+.form-group{margin-bottom:14px}
+.btn-primary{width:100%;padding:15px;background:linear-gradient(135deg,#0c4a6e,#0e7490);color:#fff;border:none;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;transition:opacity .2s}
+.btn-primary:active{opacity:.85}
+.btn-outline{width:100%;padding:13px;background:transparent;color:#0c4a6e;border:2px solid #0c4a6e;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;margin-top:10px}
+
+/* ── CONTATO ── */
+.contato-btn{display:flex;align-items:center;gap:16px;background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:18px;margin-bottom:12px;cursor:pointer;text-decoration:none;color:inherit;box-shadow:0 2px 6px rgba(0,0,0,.04);transition:transform .15s}
+.contato-btn:active{transform:scale(.98)}
+.contato-icon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.contato-info .title{font-weight:800;font-size:15px;color:#0f172a}
+.contato-info .sub{font-size:12px;color:#94a3b8;margin-top:2px}
+
+/* ── DEPS ── */
+.dep-item{background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.dep-avatar{width:36px;height:36px;background:#0e7490;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px;flex-shrink:0}
+.dep-nome{font-weight:700;font-size:14px}
+.dep-cpf{font-size:11px;color:#64748b}
+
+/* ── ALERT ── */
+.alert{border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;font-size:13px}
+.alert-green{background:#f0fdf4;border:1.5px solid #86efac;color:#166534}
+.alert-yellow{background:#fef3c7;border:1.5px solid #fbbf24;color:#92400e}
+.alert-blue{background:#f0f9ff;border:1.5px solid #bae6fd;color:#0c4a6e}
+
+/* ── LOADING ── */
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty-state{text-align:center;padding:48px 20px;color:#94a3b8}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:700;color:#cbd5e1;margin-bottom:6px}
+.empty-sub{font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-top">
+      <div class="login-logo">🏥</div>
+      <div class="login-brand">Mais Fácil Saúde</div>
+      <div class="login-sub">PORTAL DO BENEFICIÁRIO</div>
+    </div>
+    <div class="login-body">
+      <div id="login-err" class="login-err hidden"></div>
+      <label class="login-label">CPF</label>
+      <input class="login-input" id="l-cpf" type="tel" placeholder="000.000.000-00" oninput="mascaraCPF(this)" inputmode="numeric">
+      <label class="login-label">Código MFS ou Data de Nascimento</label>
+      <input class="login-input" id="l-senha" placeholder="Ex: MFS00001 ou 01/01/1990">
+      <button class="login-btn" id="btn-entrar" onclick="fazerLogin()">Entrar</button>
+      <div class="login-help">
+        Problemas? Fale conosco:<br>
+        <a href="https://wa.me/5519982008232">📱 (19) 98200-8232</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen" class="hidden">
+  <div class="app-header">
+    <div class="header-row">
+      <div class="header-brand">
+        <div class="header-logo-icon">🏥</div>
+        <div>
+          <div class="header-name">Mais Fácil Saúde</div>
+          <div class="header-sub">Portal do Beneficiário</div>
+        </div>
+      </div>
+      <div class="header-avatar" onclick="fazerLogout()">🚪</div>
+    </div>
+    <div class="header-card-mini">
+      <div>
+        <div class="mini-nome" id="h-nome">—</div>
+        <div class="mini-cod" id="h-cod">—</div>
+      </div>
+      <div class="mini-status" id="h-status">—</div>
+    </div>
+  </div>
+
+  <!-- PÁGINAS -->
+  <div id="pg-inicio" class="page hidden"></div>
+  <div id="pg-carteira" class="page hidden"></div>
+  <div id="pg-guias" class="page hidden"></div>
+  <div id="pg-agenda" class="page hidden"></div>
+  <div id="pg-contato" class="page hidden"></div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <div class="nav-item" id="nav-inicio" onclick="irPara('inicio')">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Início</div>
+    </div>
+    <div class="nav-item" id="nav-carteira" onclick="irPara('carteira')">
+      <div class="nav-icon">💳</div>
+      <div class="nav-label">Carteirinha</div>
+    </div>
+    <div class="nav-item" id="nav-guias" onclick="irPara('guias')">
+      <div class="nav-icon">📋</div>
+      <div class="nav-label">Guias</div>
+    </div>
+    <div class="nav-item" id="nav-agenda" onclick="irPara('agenda')">
+      <div class="nav-icon">📅</div>
+      <div class="nav-label">Agendar</div>
+    </div>
+    <div class="nav-item" id="nav-contato" onclick="irPara('contato')">
+      <div class="nav-icon">💬</div>
+      <div class="nav-label">Contato</div>
+    </div>
+  </nav>
+</div>
+
+<script>
+// ═══ SUPABASE ═══
+const SUPA_URL='https://mvnriexmmelyvokrsils.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12bnJpZXhtbWVseXZva3JzaWxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNjI3NTEsImV4cCI6MjA5NTgzODc1MX0.Jq0ord1TT9KSwjCBnOJ7uoQm3N_Uf3beBoHkuL4Is4c';
+const H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+
+const fmt=v=>(parseFloat(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtD=d=>d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+const fmtDH=d=>d?new Date(d).toLocaleString('pt-BR'):'—';
+const el=id=>document.getElementById(id);
+const parseDeps=d=>{if(Array.isArray(d))return d;if(typeof d==='string'&&d&&d!=='null'){try{return JSON.parse(d);}catch(e){return[];}}return[];};
+
+let CLIENTE=null, GUIAS_CLI=[], AGENDA_CLI=[];
+let PG_ATUAL='inicio';
+
+// ═══ MÁSCARA CPF ═══
+function mascaraCPF(inp){
+  let v=inp.value.replace(/\D/g,'').substring(0,11);
+  if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+  else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+  else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+  inp.value=v;
+}
+
+// ═══ LOGIN ═══
+async function fazerLogin(){
+  const cpf=el('l-cpf').value.replace(/\D/g,'');
+  const senha=el('l-senha').value.trim();
+  el('login-err').classList.add('hidden');
+  if(cpf.length!==11){mostrarErr('CPF inválido. Digite os 11 dígitos.');return;}
+  if(!senha){mostrarErr('Informe o código MFS ou data de nascimento.');return;}
+  const btn=el('btn-entrar');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Verificando...';
+  try{
+    const r=await fetch(`${SUPA_URL}/rest/v1/clientes?cpf=eq.${encodeURIComponent(el('l-cpf').value.trim())}&select=*`,{headers:H});
+    if(!r.ok){mostrarErr('Erro de conexão. Tente novamente.');btn.disabled=false;btn.textContent='Entrar';return;}
+    const dados=await r.json();
+    if(!dados||dados.length===0){mostrarErr('CPF não encontrado. Verifique seus dados ou entre em contato com a clínica.');btn.disabled=false;btn.textContent='Entrar';return;}
+    const c=dados[0];
+    // Verificar senha: código MFS ou data de nascimento
+    const senhaOK=(senha.toUpperCase()===c.codigo)||
+      (c.nascimento&&(senha===fmtD(c.nascimento)||senha===c.nascimento||senha.replace(/\D/g,'')===(c.nascimento||'').replace(/\D/g,'')));
+    if(!senhaOK){mostrarErr('Código MFS ou data de nascimento incorretos.');btn.disabled=false;btn.textContent='Entrar';return;}
+    CLIENTE={
+      codigo:c.codigo,nome:c.nome,cpf:c.cpf,nascimento:c.nascimento,
+      telefone:c.telefone||'',email:c.email||'',endereco:c.endereco||'',
+      mensalidade:parseFloat(c.mensalidade)||0,vencimento:parseInt(c.vencimento)||10,
+      status:c.status||'adimplente',plano:c.plano||'ativo',
+      carneAtual:parseInt(c.carne_atual)||1,
+      dependentes:parseDeps(c.dependentes)
+    };
+    await carregarDadosCliente();
+    iniciarApp();
+  }catch(e){mostrarErr('Erro de conexão. Verifique sua internet.');btn.disabled=false;btn.textContent='Entrar';}
+}
+function mostrarErr(msg){el('login-err').textContent=msg;el('login-err').classList.remove('hidden');}
+el('l-senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin();});
+el('l-cpf').addEventListener('keydown',e=>{if(e.key==='Enter')el('l-senha').focus();});
+
+async function carregarDadosCliente(){
+  try{
+    const [gr,ag]=await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/guias?codigo_cliente=eq.${CLIENTE.codigo}&select=*&order=emitida_em.desc`,{headers:H}),
+      fetch(`${SUPA_URL}/rest/v1/agenda?cpf=eq.${encodeURIComponent(CLIENTE.cpf)}&select=*&order=data_hora.desc&limit=20`,{headers:H})
+    ]);
+    if(gr.ok)GUIAS_CLI=await gr.json();
+    if(ag.ok)AGENDA_CLI=await ag.json();
+  }catch(e){console.error('Erro ao carregar dados:',e);}
+}
+
+function iniciarApp(){
+  el('login-screen').classList.add('hidden');
+  el('app-screen').classList.remove('hidden');
+  // Header
+  el('h-nome').textContent=CLIENTE.nome.split(' ').slice(0,2).join(' ');
+  el('h-cod').textContent=CLIENTE.codigo;
+  el('h-status').textContent=CLIENTE.status==='adimplente'?'✅ Adimplente':'⚠️ Inadimplente';
+  el('h-status').className='mini-status '+(CLIENTE.status==='adimplente'?'status-adim':'status-inadim');
+  irPara('inicio');
+}
+
+function fazerLogout(){
+  if(!confirm('Deseja sair?'))return;
+  CLIENTE=null;GUIAS_CLI=[];AGENDA_CLI=[];
+  el('app-screen').classList.add('hidden');
+  el('login-screen').classList.remove('hidden');
+  el('l-cpf').value='';el('l-senha').value='';
+}
+
+// ═══ NAVEGAÇÃO ═══
+function irPara(pg){
+  ['inicio','carteira','guias','agenda','contato'].forEach(p=>{
+    el('pg-'+p).classList.add('hidden');
+    el('nav-'+p).classList.remove('active');
+  });
+  el('pg-'+pg).classList.remove('hidden');
+  el('nav-'+pg).classList.add('active');
+  PG_ATUAL=pg;
+  if(pg==='inicio')renderInicio();
+  else if(pg==='carteira')renderCarteira();
+  else if(pg==='guias')renderGuias();
+  else if(pg==='agenda')renderAgenda();
+  else if(pg==='contato')renderContato();
+  window.scrollTo(0,0);
+}
+
+// ═══ INÍCIO ═══
+function renderInicio(){
+  const primeiroNome=CLIENTE.nome.split(' ')[0];
+  const guiasRecentes=GUIAS_CLI.slice(0,3);
+  const proxAgenda=AGENDA_CLI.find(a=>new Date(a.data_hora)>=new Date()&&a.status!=='Cancelado');
+  el('pg-inicio').innerHTML=`
+    <div class="page-title">Olá, ${primeiroNome}! 👋</div>
+    <div class="page-sub">Seu plano está ${CLIENTE.status==='adimplente'?'em dia ✅':'com pendências ⚠️'}</div>
+
+    ${CLIENTE.status==='inadimplente'?`<div class="alert alert-yellow"><span style="font-size:18px">⚠️</span><div><strong>Mensalidade em aberto</strong><br>Entre em contato para regularizar seu plano.</div></div>`:''}
+
+    ${proxAgenda?`<div class="card"><div class="card-header"><div class="card-header-icon">📅</div><div class="card-header-title">Próxima Consulta</div></div>
+      <div class="card-body"><div class="ag-data">${fmtDH(proxAgenda.data_hora)}</div>
+      <div class="ag-titulo">${proxAgenda.tipo_servico||'Consulta'}</div>
+      <div class="ag-sub">👨‍⚕️ ${proxAgenda.medico_nome||'—'}</div>
+      <div style="margin-top:10px"><span class="badge badge-emitida">${proxAgenda.status}</span></div></div></div>`:''}
+
+    <!-- Ações rápidas -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      ${[{icon:'💳',label:'Ver Carteirinha',pg:'carteira',bg:'#0c4a6e'},{icon:'📋',label:'Minhas Guias',pg:'guias',bg:'#7c3aed'},{icon:'📅',label:'Agendar Consulta',pg:'agenda',bg:'#16a34a'},{icon:'💬',label:'Falar com a Clínica',pg:'contato',bg:'#d97706'}].map(a=>`
+        <div onclick="irPara('${a.pg}')" style="background:${a.bg};border-radius:16px;padding:20px 16px;cursor:pointer;text-align:center;box-shadow:0 4px 16px ${a.bg}55;transition:transform .15s;active:transform:scale(.97)">
+          <div style="font-size:28px;margin-bottom:8px">${a.icon}</div>
+          <div style="color:#fff;font-weight:800;font-size:13px;line-height:1.3">${a.label}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Resumo do plano -->
+    <div class="card"><div class="card-header"><div class="card-header-icon">📊</div><div class="card-header-title">Resumo do Plano</div></div>
+      <div class="card-body">
+        ${[['Mensalidade',fmt(CLIENTE.mensalidade)],['Vencimento','Dia '+CLIENTE.vencimento+' de cada mês'],['Carnê','Parcela '+CLIENTE.carneAtual+' de 12'],['Dependentes',CLIENTE.dependentes.length+' dependente(s)']].map(([k,v])=>`
+          <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:13px">
+            <span style="color:#64748b;font-weight:600">${k}</span>
+            <span style="font-weight:700">${v}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    ${guiasRecentes.length>0?`<div class="card"><div class="card-header"><div class="card-header-icon">📋</div><div class="card-header-title">Últimas Guias</div><div style="margin-left:auto;font-size:12px;color:#0e7490;font-weight:700;cursor:pointer" onclick="irPara('guias')">Ver todas →</div></div>
+      <div class="card-body" style="padding:12px 18px">${guiasRecentes.map(g=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9">
+          <div><div style="font-family:monospace;font-weight:800;font-size:12px;color:#0c4a6e">${g.numero}</div><div style="font-size:11px;color:#94a3b8">${g.medico_nome||'—'} • ${fmtD(g.emitida_em)}</div></div>
+          <span class="badge ${g.status==='Baixada'?'badge-baixada':g.status==='Cancelada'?'badge-cancelada':'badge-emitida'}">${g.status}</span>
+        </div>`).join('')}</div></div>`:''}`;
+}
+
+// ═══ CARTEIRINHA ═══
+function renderCarteira(){
+  const deps=CLIENTE.dependentes;
+  el('pg-carteira').innerHTML=`
+    <div class="page-title">Carteirinha Digital</div>
+    <div class="page-sub">Apresente ao médico no momento do atendimento</div>
+
+    <div class="carteirinha">
+      <div class="cart-bg">💳</div>
+      <div class="cart-logo">🏥 MAIS FÁCIL SAÚDE</div>
+      <div class="cart-nome">${CLIENTE.nome}</div>
+      <div class="cart-cod">${CLIENTE.codigo}</div>
+      <div class="cart-row">
+        <div>
+          <div class="cart-label">CPF</div>
+          <div class="cart-val">${CLIENTE.cpf}</div>
+        </div>
+        <div>
+          <div class="cart-label">Mensalidade</div>
+          <div class="cart-val">${fmt(CLIENTE.mensalidade)}</div>
+        </div>
+        <div>
+          <span class="cart-chip ${CLIENTE.status==='adimplente'?'chip-adim':'chip-inadim'}">${CLIENTE.status==='adimplente'?'✅ Adimplente':'⚠️ Inadimplente'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Carnê -->
+    <div class="card"><div class="card-header"><div class="card-header-icon">🧾</div><div class="card-header-title">Carnê de Pagamento — Parcela ${CLIENTE.carneAtual}/12</div></div>
+      <div class="card-body">
+        <div class="parcelas-grid">${Array.from({length:12},(_,i)=>i+1).map(p=>`
+          <div class="parcela-cell ${p<CLIENTE.carneAtual?'p-pago':p===CLIENTE.carneAtual?'p-atual':'p-futuro'}">${p<CLIENTE.carneAtual?'✓':p}</div>`).join('')}
+        </div>
+        <p style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:center">✓ Pago &nbsp;|&nbsp; <span style="background:#0e7490;color:#fff;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:800">${CLIENTE.carneAtual}</span> Mês atual</p>
+      </div>
+    </div>
+
+    <!-- Dados pessoais -->
+    <div class="card"><div class="card-header"><div class="card-header-icon">👤</div><div class="card-header-title">Dados Pessoais</div></div>
+      <div class="card-body">
+        ${[['Nome',CLIENTE.nome],['CPF',CLIENTE.cpf],['Nascimento',fmtD(CLIENTE.nascimento)],['Telefone',CLIENTE.telefone||'—'],['Endereço',CLIENTE.endereco||'—']].map(([k,v])=>`
+          <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:13px;gap:12px">
+            <span style="color:#64748b;font-weight:600;flex-shrink:0">${k}</span>
+            <span style="font-weight:700;text-align:right">${v}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Dependentes -->
+    ${deps.length>0?`<div class="card"><div class="card-header"><div class="card-header-icon">👨‍👩‍👧</div><div class="card-header-title">Dependentes (${deps.length})</div></div>
+      <div class="card-body">${deps.map(d=>`
+        <div class="dep-item">
+          <div class="dep-avatar">${(d.nome||'?')[0]}</div>
+          <div><div class="dep-nome">${d.nome}</div><div class="dep-cpf">CPF: ${d.cpf||'—'} • Nasc: ${d.nascimento?fmtD(d.nascimento):'—'}</div></div>
+        </div>`).join('')}
+      </div></div>`:''}
+
+    <button class="btn-outline" onclick="compartilharCarteirinha()">📤 Compartilhar Carteirinha</button>`;
+}
+function compartilharCarteirinha(){
+  const txt=`🏥 MAIS FÁCIL SAÚDE\n\nNome: ${CLIENTE.nome}\nCódigo: ${CLIENTE.codigo}\nCPF: ${CLIENTE.cpf}\nStatus: ${CLIENTE.status==='adimplente'?'✅ Adimplente':'⚠️ Inadimplente'}\nMensalidade: ${fmt(CLIENTE.mensalidade)}\n\nContato: (19) 98200-8232`;
+  if(navigator.share){navigator.share({title:'Carteirinha Mais Fácil Saúde',text:txt}).catch(()=>{});}
+  else{navigator.clipboard.writeText(txt).then(()=>alert('✅ Dados copiados para a área de transferência!'));}
+}
+
+// ═══ GUIAS ═══
+function renderGuias(){
+  el('pg-guias').innerHTML=`
+    <div class="page-title">Minhas Guias</div>
+    <div class="page-sub">${GUIAS_CLI.length} guia(s) emitida(s)</div>
+    ${GUIAS_CLI.length===0?`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Nenhuma guia ainda</div><div class="empty-sub">Suas guias de atendimento aparecerão aqui.</div></div>`:
+    GUIAS_CLI.map(g=>`
+      <div class="guia-item">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="guia-numero">${g.numero}</div>
+            <div class="guia-info">📅 ${fmtDH(g.emitida_em)}</div>
+          </div>
+          <span class="badge ${g.status==='Baixada'?'badge-baixada':g.status==='Cancelada'?'badge-cancelada':'badge-emitida'}">${g.status}</span>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9">
+          <div style="font-size:13px;display:flex;flex-wrap:wrap;gap:8px">
+            <span>👨‍⚕️ <strong>${g.medico_nome||'—'}</strong></span>
+            <span style="color:#94a3b8">•</span>
+            <span>🏥 ${g.tipo_servico||'Consulta'}</span>
+          </div>
+          ${g.info_complementar?`<div style="margin-top:6px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:6px 10px;font-size:11px;color:#b45309">⚕️ ${g.info_complementar}</div>`:''}
+          <div class="guia-row">
+            <span style="font-size:12px;color:#64748b">Paciente: ${g.nome_paciente||CLIENTE.nome}</span>
+            <span style="font-weight:800;font-size:14px;color:#0e7490">${g.valor_consulta?'R$ '+parseFloat(g.valor_consulta).toFixed(2):'—'}</span>
+          </div>
+        </div>
+      </div>`).join('')}`;
+}
+
+// ═══ AGENDA ═══
+function renderAgenda(){
+  const futuras=AGENDA_CLI.filter(a=>new Date(a.data_hora)>=new Date()&&a.status!=='Cancelado').sort((a,b)=>new Date(a.data_hora)-new Date(b.data_hora));
+  const passadas=AGENDA_CLI.filter(a=>new Date(a.data_hora)<new Date()||a.status==='Cancelado').slice(0,5);
+  el('pg-agenda').innerHTML=`
+    <div class="page-title">Agenda</div>
+    <div class="page-sub">Consultas e agendamentos</div>
+
+    <!-- NOVO AGENDAMENTO -->
+    <div class="card"><div class="card-header"><div class="card-header-icon">📅</div><div class="card-header-title">Solicitar Novo Agendamento</div></div>
+      <div class="card-body">
+        <div class="alert alert-blue"><span>ℹ️</span><span>Preencha o formulário e a clínica entrará em contato para confirmar data e horário.</span></div>
+        <div class="form-group"><label class="form-label">Tipo de Consulta</label>
+          <select class="form-control" id="ag-tipo"><option value="Consulta">Consulta</option><option value="Retorno">Retorno</option><option value="Exame">Exame</option><option value="Procedimento">Procedimento</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Especialidade Desejada</label>
+          <input class="form-control" id="ag-esp" placeholder="Ex: Clínico Geral, Cardiologista...">
+        </div>
+        <div class="form-group"><label class="form-label">Data Preferencial</label>
+          <input class="form-control" id="ag-data" type="date" min="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="form-group"><label class="form-label">Horário Preferencial</label>
+          <select class="form-control" id="ag-hora"><option value="manhã">Manhã (8h–12h)</option><option value="tarde">Tarde (12h–18h)</option><option value="qualquer">Qualquer horário</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Paciente</label>
+          <select class="form-control" id="ag-pac">
+            <option value="${CLIENTE.nome}">Titular — ${CLIENTE.nome}</option>
+            ${CLIENTE.dependentes.map(d=>`<option value="${d.nome}">Dependente — ${d.nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Observações / Sintomas</label>
+          <textarea class="form-control" id="ag-obs" rows="3" placeholder="Descreva brevemente o motivo da consulta..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="solicitarAgendamento()">📅 Enviar Solicitação</button>
+      </div>
+    </div>
+
+    <!-- PRÓXIMAS -->
+    ${futuras.length>0?`<div class="card"><div class="card-header"><div class="card-header-icon">🔜</div><div class="card-header-title">Próximas Consultas (${futuras.length})</div></div>
+      <div class="card-body">${futuras.map(a=>`
+        <div class="ag-item">
+          <div class="ag-data">📅 ${fmtDH(a.data_hora)}</div>
+          <div class="ag-titulo">${a.tipo_servico||'Consulta'} ${a.convenio?'• '+a.convenio:''}</div>
+          <div class="ag-sub">👨‍⚕️ ${a.medico_nome||'—'} ${a.endereco_medico?'• '+a.endereco_medico:''}</div>
+          <div style="margin-top:6px"><span class="badge badge-emitida">${a.status}</span></div>
+        </div>`).join('')}
+      </div></div>`:''}
+
+    <!-- HISTÓRICO -->
+    ${passadas.length>0?`<div class="card"><div class="card-header"><div class="card-header-icon">🕐</div><div class="card-header-title">Histórico</div></div>
+      <div class="card-body">${passadas.map(a=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9">
+          <div><div style="font-size:13px;font-weight:700">${a.tipo_servico||'Consulta'}</div><div style="font-size:11px;color:#94a3b8">${fmtDH(a.data_hora)} • ${a.medico_nome||'—'}</div></div>
+          <span class="badge ${a.status==='Guia Emitida'?'badge-baixada':a.status==='Cancelado'?'badge-cancelada':'badge-emitida'}">${a.status}</span>
+        </div>`).join('')}
+      </div></div>`:''}`;
+}
+
+async function solicitarAgendamento(){
+  const tipo=el('ag-tipo').value,esp=el('ag-esp').value.trim();
+  const data=el('ag-data').value,hora=el('ag-hora').value;
+  const pac=el('ag-pac').value,obs=el('ag-obs').value.trim();
+  if(!esp){alert('Informe a especialidade desejada.');return;}
+  if(!data){alert('Informe a data preferencial.');return;}
+  const btn=document.querySelector('#pg-agenda .btn-primary');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Enviando...';
+  try{
+    const msg=`*Nova Solicitação de Agendamento*\n\n👤 *Paciente:* ${pac}\n📋 *Código:* ${CLIENTE.codigo}\n📞 *Telefone:* ${CLIENTE.telefone||'—'}\n\n🏥 *Tipo:* ${tipo}\n⚕️ *Especialidade:* ${esp}\n📅 *Data preferencial:* ${fmtD(data)}\n⏰ *Horário:* ${hora}\n📝 *Observações:* ${obs||'—'}`;
+    // Enviar via WhatsApp
+    const url='https://wa.me/5519982008232?text='+encodeURIComponent(msg);
+    window.open(url,'_blank');
+    // Também salvar na agenda do sistema
+    await fetch(`${SUPA_URL}/rest/v1/agenda`,{method:'POST',headers:H,body:JSON.stringify({convenio:'Mais Fácil Saúde',nome_paciente:pac,cpf:CLIENTE.cpf,codigo_mfs:CLIENTE.codigo,telefone:CLIENTE.telefone,tipo_servico:tipo,data_hora:data+'T08:00:00',status:'Agendado',observacao:esp+(obs?'\n'+obs:'')})});
+    alert('✅ Solicitação enviada!\nA clínica entrará em contato para confirmar.');
+    el('ag-esp').value='';el('ag-data').value='';el('ag-obs').value='';
+    await carregarDadosCliente();renderAgenda();
+  }catch(e){alert('❌ Erro ao enviar. Tente pelo WhatsApp diretamente.');}
+  btn.disabled=false;btn.textContent='📅 Enviar Solicitação';
+}
+
+// ═══ CONTATO ═══
+function renderContato(){
+  el('pg-contato').innerHTML=`
+    <div class="page-title">Contato</div>
+    <div class="page-sub">Fale com a Mais Fácil Saúde</div>
+
+    <a href="https://wa.me/5519982008232" target="_blank" class="contato-btn">
+      <div class="contato-icon" style="background:#dcfce7">📱</div>
+      <div class="contato-info">
+        <div class="title">WhatsApp</div>
+        <div class="sub">(19) 98200-8232 — Atendimento rápido</div>
+      </div>
+      <span style="color:#94a3b8;font-size:18px">›</span>
+    </a>
+
+    <a href="tel:+551935498176" class="contato-btn">
+      <div class="contato-icon" style="background:#dbeafe">📞</div>
+      <div class="contato-info">
+        <div class="title">Telefone Fixo</div>
+        <div class="sub">(19) 3549-8176</div>
+      </div>
+      <span style="color:#94a3b8;font-size:18px">›</span>
+    </a>
+
+    <a href="https://wa.me/5519982008232?text=Olá,%20preciso%20de%20ajuda%20com%20meu%20plano.%20Meu%20código%20é%20${CLIENTE?CLIENTE.codigo:''}." target="_blank" class="contato-btn">
+      <div class="contato-icon" style="background:#fef3c7">🆘</div>
+      <div class="contato-info">
+        <div class="title">Suporte ao Plano</div>
+        <div class="sub">Dúvidas, boletos, cancelamento</div>
+      </div>
+      <span style="color:#94a3b8;font-size:18px">›</span>
+    </a>
+
+    <a href="https://maps.google.com/?q=Rua+1+de+maio+81+Mogi+Mirim+SP" target="_blank" class="contato-btn">
+      <div class="contato-icon" style="background:#f0f9ff">📍</div>
+      <div class="contato-info">
+        <div class="title">Endereço</div>
+        <div class="sub">Rua 1° de Maio, 81 — Centro, Mogi Mirim/SP</div>
+      </div>
+      <span style="color:#94a3b8;font-size:18px">›</span>
+    </a>
+
+    <div class="card" style="margin-top:8px"><div class="card-header"><div class="card-header-icon">💬</div><div class="card-header-title">Enviar Mensagem</div></div>
+      <div class="card-body">
+        <div class="form-group"><label class="form-label">Assunto</label>
+          <select class="form-control" id="msg-assunto">
+            <option value="Dúvida sobre o plano">Dúvida sobre o plano</option>
+            <option value="Boleto / Pagamento">Boleto / Pagamento</option>
+            <option value="Problema com guia">Problema com guia</option>
+            <option value="Cancelamento">Cancelamento</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Mensagem</label>
+          <textarea class="form-control" id="msg-texto" rows="4" placeholder="Descreva sua dúvida ou solicitação..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="enviarMensagem()">📤 Enviar pelo WhatsApp</button>
+      </div>
+    </div>`;
+}
+function enviarMensagem(){
+  const ass=el('msg-assunto').value,txt=el('msg-texto').value.trim();
+  if(!txt){alert('Escreva sua mensagem.');return;}
+  const msg=`*${ass}*\n\n👤 ${CLIENTE.nome} (${CLIENTE.codigo})\n📞 ${CLIENTE.telefone||'—'}\n\n${txt}`;
+  window.open('https://wa.me/5519982008232?text='+encodeURIComponent(msg),'_blank');
+}
+</script>
+</body>
+</html>

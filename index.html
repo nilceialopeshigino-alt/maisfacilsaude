@@ -744,30 +744,64 @@ let _AG_CONVENIO="";
 function renderAgenda(){
   const hj=new Date().toISOString().split("T")[0];
   const ds=el("ag-data")?.value||hj,fs=el("ag-filtro")?.value||"todos",fd=el("ag-dia")?.value||"dia";
+  const buscaNome=(el("ag-busca-nome")?.value||"").trim().toLowerCase();
+  const filtrMed=el("ag-filtro-med")?.value||"";
   let af=[...AGENDA];
   if(fd==="dia")af=af.filter(a=>a.dataHora.startsWith(ds));
   else if(fd==="semana"){const d=new Date(ds+"T00:00:00"),ini=new Date(d);ini.setDate(d.getDate()-d.getDay());const fim=new Date(ini);fim.setDate(ini.getDate()+6);af=af.filter(a=>{const dd=new Date(a.dataHora);return dd>=ini&&dd<=fim;});}
   else if(fd==="mes")af=af.filter(a=>a.dataHora.startsWith(ds.substring(0,7)));
   if(fs!=="todos")af=af.filter(a=>a.status===fs);
+  if(buscaNome)af=af.filter(a=>(a.nomePaciente||"").toLowerCase().includes(buscaNome)||(a.cpf||"").includes(buscaNome)||(a.codigoMFS||"").toLowerCase().includes(buscaNome));
+  if(filtrMed)af=af.filter(a=>a.medicoId===filtrMed||(a.medicoNome||"").toLowerCase().includes(filtrMed.toLowerCase()));
   af.sort((a,b)=>a.dataHora.localeCompare(b.dataHora));
   const tot=af.length,ag=af.filter(a=>a.status==="Agendado").length,pg=af.filter(a=>["Pago","Guia Emitida"].includes(a.status)).length,ca=af.filter(a=>["Cancelado","Faltou"].includes(a.status)).length;
   el("aba-agenda").innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
       <div><h2 style="font-weight:900;font-size:20px;color:#0f172a;margin:0">📅 Agenda de Consultas e Exames</h2><p style="color:#94a3b8;font-size:13px;margin:4px 0 0">Todos os convênios: Mais Fácil Saúde, Particular, Outros</p></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <select id="ag-dia" class="form-control" style="width:auto" onchange="renderAgenda()">
-          <option value="dia" ${fd==="dia"?"selected":""}>📆 Por dia</option>
-          <option value="semana" ${fd==="semana"?"selected":""}>📅 Por semana</option>
-          <option value="mes" ${fd==="mes"?"selected":""}>🗓️ Por mês</option>
-          <option value="todos" ${fd==="todos"?"selected":""}>📋 Todos</option>
-        </select>
-        ${fd!=="todos"?`<input type="date" id="ag-data" class="form-control" style="width:auto" value="${ds}" onchange="renderAgenda()">`:``}
-        <select id="ag-filtro" class="form-control" style="width:auto" onchange="renderAgenda()">
-          <option value="todos">Todos</option>
-          ${STATUS_AG.map(s=>`<option value="${s}" ${fs===s?"selected":""}>${s}</option>`).join("")}
-        </select>
         <button class="btn btn-primary" onclick="abrirFormAgenda()">+ Novo Agendamento</button>
       </div>
+    </div>
+    <!-- FILTROS -->
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-bottom:18px">
+      <div style="font-size:11px;font-weight:800;color:#64748b;letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px">🔍 Filtros</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">NOME DO PACIENTE / CPF / CÓDIGO</label>
+          <input class="form-control" id="ag-busca-nome" placeholder="🔍 Buscar paciente..." value="${buscaNome}" oninput="renderAgenda()" style="font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">MÉDICO</label>
+          <select class="form-control" id="ag-filtro-med" onchange="renderAgenda()" style="font-size:13px">
+            <option value="">Todos os médicos</option>
+            ${MEDICOS.map(m=>`<option value="${m.id}" ${filtrMed===m.id?"selected":""}>${m.nome}</option>`).join("")}
+            <option value="externo" ${filtrMed==="externo"?"selected":""}>🔗 Médico Externo</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">PERÍODO</label>
+          <select id="ag-dia" class="form-control" style="font-size:13px" onchange="renderAgenda()">
+            <option value="dia" ${fd==="dia"?"selected":""}>📆 Por dia</option>
+            <option value="semana" ${fd==="semana"?"selected":""}>📅 Por semana</option>
+            <option value="mes" ${fd==="mes"?"selected":""}>🗓️ Por mês</option>
+            <option value="todos" ${fd==="todos"?"selected":""}>📋 Todos</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px">STATUS</label>
+          <select id="ag-filtro" class="form-control" style="font-size:13px" onchange="renderAgenda()">
+            <option value="todos">Todos</option>
+            ${STATUS_AG.map(s=>`<option value="${s}" ${fs===s?"selected":""}>${s}</option>`).join("")}
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${fd!=="todos"?`<input type="date" id="ag-data" class="form-control" style="font-size:13px" value="${ds}" onchange="renderAgenda()">`:``}
+          <button onclick="window._limparFiltrosAgenda()" style="padding:8px 14px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;color:#64748b;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">✕ Limpar</button>
+        </div>
+      </div>
+      ${(buscaNome||filtrMed)?`<div style="margin-top:10px;padding:8px 12px;background:#f0f9ff;border-radius:8px;font-size:12px;color:#0e7490;font-weight:700">
+        🔍 Filtro ativo: ${buscaNome?`paciente "<strong>${buscaNome}</strong>"`:""} ${filtrMed?`médico "<strong>${MEDICOS.find(m=>m.id===filtrMed)?.nome||filtrMed}</strong>"`:""} — <strong>${af.length}</strong> resultado(s)
+      </div>`:""}
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
       <div class="stat-card" style="border-left:5px solid #0e7490"><div>📋</div><div style="font-size:24px;font-weight:900;color:#0e7490;font-family:monospace">${tot}</div><div style="font-size:11px;color:#94a3b8;font-weight:700">Total</div></div>
@@ -866,6 +900,12 @@ function renderAgenda(){
       </div>
     </div>`;
 }
+
+window._limparFiltrosAgenda=function(){
+  const e1=el('ag-busca-nome'),e2=el('ag-filtro-med'),e3=el('ag-filtro'),e4=el('ag-dia');
+  if(e1)e1.value='';if(e2)e2.value='';if(e3)e3.value='todos';if(e4)e4.value='dia';
+  renderAgenda();
+};
 
 function selecionarConvenioAg(conv){
   _AG_CONVENIO=conv;el("ag-convenio-sel").value=conv;

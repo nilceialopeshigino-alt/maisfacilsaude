@@ -1702,16 +1702,21 @@ async function salvarContaBanco(conta) {
       forma_pgto: conta.formaPgto||null,
       criado_em: new Date().toISOString()
     };
-    if(conta.id && typeof conta.id === 'number' && conta.id > 0) {
+    if(conta.id !== null && conta.id !== undefined) {
+      // Registro existente — atualizar
       await dbUpdate('contas_pagar','id',conta.id,dados);
     } else {
+      // Novo registro — inserir e capturar id gerado pelo banco
       const res = await dbInsert('contas_pagar', dados);
       if(res) {
         const newId = Array.isArray(res) ? res[0]?.id : res?.id;
         if(newId) conta.id = newId;
       }
     }
-  } catch(e) { console.warn('Erro ao salvar conta:', e); }
+  } catch(e) {
+    console.error('Erro ao salvar conta:', e);
+    alert('❌ Erro ao salvar no banco. Verifique se a tabela contas_pagar foi criada no Supabase.');
+  }
 }
 
 async function excluirContaBanco(id) {
@@ -2008,7 +2013,7 @@ async function salvarConta() {
 
   const idEdit = el('fc-id').value;
   const conta = {
-    id: idEdit ? parseInt(idEdit) : CONTA_ID++,
+    id: idEdit ? parseInt(idEdit) : null,
     descricao:      desc,
     categoria:      el('fc-cat').value,
     prioridade:     el('fc-prio').value,
@@ -2078,7 +2083,7 @@ async function renovarConta(id) {
   const novoVenc = d.toISOString().split('T')[0];
   const nova = {
     ...c,
-    id: CONTA_ID++,
+    id: null,
     status: 'aberta',
     dataPagamento: '',
     dataVencimento: novoVenc,

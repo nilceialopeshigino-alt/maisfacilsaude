@@ -126,6 +126,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
       <button class="tab" onclick="mostrarAba('relatorios',this)">📈 Relatórios</button>
       <button class="tab" onclick="mostrarAba('formularios',this)">📄 Formulários</button>
       <button class="tab" onclick="mostrarAba('financeiro',this)">💰 Financeiro</button>
+      <button class="tab" onclick="mostrarAba('senhas',this)">🎫 Senhas</button>
     </div>
     <div id="tabs-medico" class="hidden" style="padding:8px 28px">
       <span style="color:#7dd3fc;font-size:13px;font-weight:700" id="medico-tab-label">👨‍⚕️ Portal do Médico</span>
@@ -143,6 +144,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
     <div id="aba-portal" class="hidden"></div>
     <div id="aba-formularios" class="hidden"></div>
     <div id="aba-financeiro" class="hidden"></div>
+    <div id="aba-senhas" class="hidden"></div>
   </div>
 </div>
 
@@ -272,6 +274,7 @@ function mostrarAba(aba,btn){
   else if(aba==="relatorios")renderRelatorios();
   else if(aba==="formularios")renderFormularios();
   else if(aba==="financeiro")renderFinanceiro();
+  else if(aba==="senhas")renderSenhas();
 }
 
 // ═══ DASHBOARD ═══
@@ -2133,5 +2136,244 @@ function imprimirFinanceiro() {
   <div class="rodape">Mais Fácil Saúde • CNPJ: 26.563.284/0001-18 • Mogi Mirim/SP • (19) 98200-8232</div>
   </body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+}
+</script>
+<script>
+// ══════════════════════════════════════════════
+// ── MÓDULO SENHAS ──
+// ══════════════════════════════════════════════
+
+let SENHA_SEQ = 1;
+let SENHA_FILA = [];
+let SENHA_ATUAL_IDX = -1;
+
+function padSenha(n){ return String(n).padStart(3,'0'); }
+
+function renderSenhas(){
+  const aguardando = SENHA_FILA.filter(s=>s.status==='aguardando').length;
+  const chamados   = SENHA_FILA.filter(s=>s.status==='atual').length;
+  const atendidos  = SENHA_FILA.filter(s=>s.status==='atendida').length;
+  const atual      = SENHA_FILA.find(s=>s.status==='atual');
+
+  el("aba-senhas").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-weight:900;font-size:20px;color:#0f172a;margin:0">🎫 Emissão de Senhas</h2>
+        <p style="color:#94a3b8;font-size:13px;margin:4px 0 0">Controle de fila de atendimento</p>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="resetarSenhas()" style="color:#dc2626;border-color:#dc2626">🔄 Zerar Fila</button>
+    </div>
+
+    <!-- CARDS RESUMO -->
+    <div class="grid4" style="margin-bottom:20px">
+      <div class="stat-card" style="border-left:5px solid #0e7490">
+        <div style="font-size:20px">🎫</div>
+        <div style="font-size:28px;font-weight:900;color:#0e7490;font-family:monospace">${padSenha(SENHA_SEQ)}</div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:700">Próxima senha</div>
+      </div>
+      <div class="stat-card" style="border-left:5px solid #f97316">
+        <div style="font-size:20px">⏳</div>
+        <div style="font-size:28px;font-weight:900;color:#f97316;font-family:monospace">${aguardando}</div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:700">Aguardando</div>
+      </div>
+      <div class="stat-card" style="border-left:5px solid #16a34a">
+        <div style="font-size:20px">✅</div>
+        <div style="font-size:28px;font-weight:900;color:#16a34a;font-family:monospace">${atendidos}</div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:700">Atendidos</div>
+      </div>
+      <div class="stat-card" style="border-left:5px solid #0c4a6e;cursor:pointer" onclick="chamarProximaSenha()">
+        <div style="font-size:20px">📢</div>
+        <div style="font-size:${atual?'20':'14'}px;font-weight:900;color:#0c4a6e;font-family:monospace">${atual?padSenha(atual.num):'—'}</div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:700">${atual?'Em atendimento':'Clique p/ chamar'}</div>
+      </div>
+    </div>
+
+    <!-- PAINEL ATUAL -->
+    ${atual?`<div style="background:linear-gradient(135deg,#0c4a6e,#0e7490);border-radius:16px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+      <div>
+        <div style="color:#7dd3fc;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">📢 Chamando agora</div>
+        <div style="color:#fff;font-size:15px;font-weight:700">${atual.pac}</div>
+        <div style="color:#7dd3fc;font-size:13px">${atual.med}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="color:#7dd3fc;font-size:12px;font-weight:700;letter-spacing:2px">SENHA</div>
+        <div style="color:#fff;font-size:60px;font-weight:900;font-family:monospace;line-height:1">${padSenha(atual.num)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="chamarProximaSenha()" style="padding:10px 18px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:13px">📢 Chamar próximo</button>
+        <button onclick="marcarAtendida(${atual.num})" style="padding:10px 18px;background:#16a34a;border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:13px">✅ Confirmar atendimento</button>
+      </div>
+    </div>`:`
+    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:14px;padding:16px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:center">
+      <span style="font-size:24px">📢</span>
+      <div>
+        <div style="font-weight:700;color:#0c4a6e">Nenhuma senha sendo chamada</div>
+        <div style="font-size:12px;color:#0e7490">Emita uma senha e clique em "Chamar próximo"</div>
+      </div>
+      ${aguardando>0?`<button onclick="chamarProximaSenha()" style="margin-left:auto;padding:9px 16px;background:#0e7490;border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:13px">📢 Chamar próximo</button>`:``}
+    </div>`}
+
+    <div class="grid2">
+      <!-- EMITIR SENHA -->
+      <div class="card">
+        <div class="card-header"><span>🎫</span><div class="card-title">Emitir Nova Senha</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Nome do Paciente *</label>
+            <input class="form-control" id="s-pac" placeholder="Nome completo do paciente" oninput="atualizarPreviewSenha()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Médico *</label>
+            <select class="form-control" id="s-med" onchange="atualizarPreviewSenha()">
+              <option value="">Selecione o médico...</option>
+              ${MEDICOS.map(m=>`<option value="${m.nome} — ${m.especialidade}">${m.nome} — ${m.especialidade}</option>`).join('')}
+              <option value="outro">✏️ Digitar manualmente</option>
+            </select>
+          </div>
+          <div id="s-med-manual" style="display:none" class="form-group">
+            <label class="form-label">Nome do Médico</label>
+            <input class="form-control" id="s-med-txt" placeholder="Ex: Dr. João Silva" oninput="atualizarPreviewSenha()">
+          </div>
+
+          <!-- Preview da senha -->
+          <div id="senha-preview" style="border:2px dashed #e2e8f0;border-radius:14px;padding:20px;text-align:center;margin-bottom:16px;background:#f8fafc;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">🏥 MAIS FÁCIL SAÚDE</div>
+            <div style="font-size:56px;font-weight:900;color:#0c4a6e;font-family:monospace;line-height:1">${padSenha(SENHA_SEQ)}</div>
+            <div id="prev-pac" style="font-size:15px;font-weight:700;color:#1e293b;margin-top:8px">—</div>
+            <div id="prev-med" style="font-size:12px;color:#64748b;margin-top:2px">—</div>
+          </div>
+
+          <button class="btn btn-primary" onclick="emitirSenha()" style="width:100%;padding:14px;font-size:15px">🖨️ Emitir e Imprimir Senha</button>
+        </div>
+      </div>
+
+      <!-- FILA DE ESPERA -->
+      <div class="card">
+        <div class="card-header"><span>⏳</span><div class="card-title">Fila de Espera</div>
+          <div style="margin-left:auto;font-size:12px;color:#94a3b8;font-weight:700">${aguardando} aguardando</div>
+        </div>
+        <div class="card-body" style="padding:0;max-height:440px;overflow-y:auto">
+          ${SENHA_FILA.length===0?`<div style="text-align:center;padding:40px 20px;color:#cbd5e1"><div style="font-size:40px;margin-bottom:8px">🎫</div><div style="font-size:14px;font-weight:700;color:#94a3b8">Nenhuma senha emitida</div></div>`:
+          [...SENHA_FILA].reverse().map(s=>`
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #f1f5f9;background:${s.status==='atual'?'#f0f9ff':s.status==='atendida'?'#f0fdf4':'#fff'}">
+              <div style="font-size:22px;font-weight:900;font-family:monospace;color:${s.status==='atual'?'#0e7490':s.status==='atendida'?'#16a34a':'#0c4a6e'};min-width:48px">${padSenha(s.num)}</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:13px;color:#0f172a">${s.pac}</div>
+                <div style="font-size:11px;color:#94a3b8">${s.med}</div>
+              </div>
+              <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;background:${s.status==='aguardando'?'#dbeafe':s.status==='atual'?'#0e7490':'#dcfce7'};color:${s.status==='aguardando'?'#1d4ed8':s.status==='atual'?'#fff':'#16a34a'}">
+                ${s.status==='aguardando'?'⏳ Aguardando':s.status==='atual'?'📢 Chamado':'✅ Atendido'}
+              </span>
+              ${s.status==='aguardando'?`<button onclick="chamarEspecifica(${s.num})" title="Chamar esta senha" style="padding:4px 8px;background:#f0f9ff;border:1.5px solid #0e7490;border-radius:6px;color:#0e7490;font-size:11px;cursor:pointer">📢</button>`:''}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // Listener para select médico manual
+  const selMed = el('s-med');
+  if(selMed) {
+    selMed.addEventListener('change', function(){
+      el('s-med-manual').style.display = this.value==='outro'?'block':'none';
+      atualizarPreviewSenha();
+    });
+  }
+}
+
+function atualizarPreviewSenha(){
+  const pac = el('s-pac')?.value.trim()||'';
+  const medSel = el('s-med')?.value||'';
+  const medTxt = el('s-med-txt')?.value.trim()||'';
+  const med = medSel==='outro'?medTxt:medSel;
+  el('prev-pac').textContent = pac||'—';
+  el('prev-med').textContent = med||'—';
+}
+
+function emitirSenha(){
+  const pac = el('s-pac')?.value.trim();
+  const medSel = el('s-med')?.value||'';
+  const medTxt = el('s-med-txt')?.value.trim()||'';
+  const med = medSel==='outro'?medTxt:medSel;
+  if(!pac){alert('Informe o nome do paciente.');return;}
+  if(!med||med===''){alert('Selecione ou informe o médico.');return;}
+  const s = {num:SENHA_SEQ++, pac, med, status:'aguardando', hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})};
+  SENHA_FILA.push(s);
+  if(el('s-pac'))el('s-pac').value='';
+  if(el('s-med'))el('s-med').value='';
+  if(el('s-med-txt'))el('s-med-txt').value='';
+  if(el('s-med-manual'))el('s-med-manual').style.display='none';
+  imprimirSenhaHTML(s);
+  renderSenhas();
+}
+
+function chamarProximaSenha(){
+  const pendentes = SENHA_FILA.filter(s=>s.status==='aguardando');
+  if(pendentes.length===0){alert('Nenhuma senha na fila de espera.');return;}
+  // Marcar atual como atendida
+  const atualAnterior = SENHA_FILA.find(s=>s.status==='atual');
+  if(atualAnterior) atualAnterior.status='atendida';
+  // Chamar próximo
+  const proximo = pendentes[0];
+  proximo.status='atual';
+  SENHA_ATUAL_IDX = SENHA_FILA.indexOf(proximo);
+  renderSenhas();
+}
+
+function chamarEspecifica(num){
+  const s = SENHA_FILA.find(x=>x.num===num);
+  if(!s||s.status!=='aguardando') return;
+  const atualAnterior = SENHA_FILA.find(x=>x.status==='atual');
+  if(atualAnterior) atualAnterior.status='atendida';
+  s.status='atual';
+  SENHA_ATUAL_IDX = SENHA_FILA.indexOf(s);
+  renderSenhas();
+}
+
+function marcarAtendida(num){
+  const s = SENHA_FILA.find(x=>x.num===num);
+  if(s) s.status='atendida';
+  SENHA_ATUAL_IDX = -1;
+  renderSenhas();
+}
+
+function resetarSenhas(){
+  if(!confirm('Zerar toda a fila e reiniciar do 001?'))return;
+  SENHA_SEQ=1; SENHA_FILA=[]; SENHA_ATUAL_IDX=-1;
+  renderSenhas();
+}
+
+function imprimirSenhaHTML(s){
+  const logoHtml = LOGO_URL?`<img src="${LOGO_URL}" style="height:50px;object-fit:contain;margin-bottom:4px">`:`<div style="font-family:Arial,sans-serif;font-weight:900;font-size:16px;color:#0c4a6e">MAIS FÁCIL SAÚDE</div>`;
+  const w=window.open('','_blank','width=300,height=420');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Senha ${padSenha(s.num)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:24px 20px;text-align:center;color:#000;background:#fff}
+    .topo{margin-bottom:14px}
+    .sub{font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+    .linha{border-top:1.5px dashed #cbd5e1;margin:14px 0}
+    .label{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;font-weight:700}
+    .num{font-size:84px;font-weight:900;color:#0c4a6e;line-height:1;margin:6px 0 16px;font-family:monospace}
+    .pac{font-size:16px;font-weight:700;margin-bottom:4px}
+    .med{font-size:12px;color:#475569;margin-bottom:20px}
+    .hora{font-size:10px;color:#94a3b8;margin-top:8px}
+    .aguarde{font-size:11px;color:#0e7490;font-weight:700;margin-top:12px;padding:8px;border:1px solid #bae6fd;border-radius:8px;background:#f0f9ff}
+    .rodape{font-size:9px;color:#cbd5e1;margin-top:16px}
+  </style></head><body>
+  <div class="topo">${logoHtml}<div class="sub">Consultas e Diagnósticos</div></div>
+  <div class="linha"></div>
+  <div class="label">sua senha</div>
+  <div class="num">${padSenha(s.num)}</div>
+  <div class="label">paciente</div>
+  <div class="pac">${s.pac}</div>
+  <div class="label">médico</div>
+  <div class="med">${s.med}</div>
+  <div class="linha"></div>
+  <div class="hora">Emitida às ${s.hora}</div>
+  <div class="aguarde">⏳ Aguarde ser chamado(a)</div>
+  <div class="rodape">Mais Fácil Saúde • (19) 98200-8232<br>Mogi Mirim / SP</div>
+  <script>setTimeout(()=>{window.print();},400);<\/script>
+  </body></html>`);
+  w.document.close();
 }
 </script>
